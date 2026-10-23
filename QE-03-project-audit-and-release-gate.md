@@ -22,7 +22,7 @@
 
 ## 0.1 Landing in the target project
 
-1. Copy the "QE adoption bundle" to the target repository root as described in `QE-00-index.md` §7 (documents sit next to `qe/`).
+1. Copy the "AutoQe adoption bundle" to the target repository root as described in `QE-00-index.md` §7 (documents sit next to `qe/`).
 2. Copy `qe/templates/project-audit/` to `qe-audit/<project>-<date>/`.
 3. Fill in five files along S0→S4: `00-fact-baseline`, `01-entry-inventory`, `02-scan-log`, `03-bug-ledger`, `04-release-decision`.
 4. If any of the five files is missing, no release conclusion may be issued; the verdict must cite gate results and bug IDs.

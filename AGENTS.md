@@ -63,7 +63,7 @@ npm run qe         # guards + ratchet diff (claim "only tightened" only when RAT
 
 ## 6. Adopting into a real repository (three steps)
 
-1. Follow [`QE-00-index.md`](QE-00-index.md) §7 to copy the QE adoption bundle: all method-layer documents `QE-00`–`QE-09` + `qe/` + `qe.config.json` + the `qe:*` scripts from `package.json` + `tsconfig.qe.json`. Merge `AGENTS.md`; never overwrite rules the target repository already has. Use `tsconfig.qe.json` as a separate file and do not overwrite the target's `tsconfig.json`. Do not copy `业务域/` (the host project's equivalent spec), `qe/ratchet.json`, `qe/demo/`, `qe-report/`, or `qe-audit/`.
+1. Follow [`QE-00-index.md`](QE-00-index.md) §7 to copy the AutoQe adoption bundle: all method-layer documents `QE-00`–`QE-09` + `qe/` + `qe.config.json` + the `qe:*` scripts from `package.json` + `tsconfig.qe.json`. Merge `AGENTS.md`; never overwrite rules the target repository already has. Use `tsconfig.qe.json` as a separate file and do not overwrite the target's `tsconfig.json`. Do not copy `业务域/` (the host project's equivalent spec), `qe/ratchet.json`, `qe/demo/`, `qe-report/`, or `qe-audit/`.
 2. Edit `qe.config.json`:
    - `schema.provider`: `prisma` (built in) or `none`; `schema.path` points at the schema file
    - `source.collector`: `ts` (built in) or `none`; `source.roots` / `source.extensions` point at the source tree

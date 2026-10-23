@@ -1,8 +1,8 @@
 {
-  "name": "ai-qe-toolkit",
+  "name": "autoqe",
   "version": "1.0.0",
   "type": "module",
-  "description": "Quality Engineering toolkit for AI-assisted development: invariant registry, static guards, bad-sample self-tests and a ratchet baseline.",
+  "description": "AutoQe — Quality Engineering toolkit for AI-assisted development: invariant registry, static guards, bad-sample self-tests and a ratchet baseline.",
   "license": "MIT",
   "keywords": [
     "quality-engineering",
@@ -18,12 +18,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xufuji5/ai-qe-toolkit.git"
+    "url": "git+https://github.com/xufuji5/AutoQe.git"
   },
   "bugs": {
-    "url": "https://github.com/xufuji5/ai-qe-toolkit/issues"
+    "url": "https://github.com/xufuji5/AutoQe/issues"
   },
-  "homepage": "https://github.com/xufuji5/ai-qe-toolkit#readme",
+  "homepage": "https://github.com/xufuji5/AutoQe#readme",
   "scripts": {
     "typecheck": "tsc -p tsconfig.qe.json",
     "qe": "node qe/cli.ts run",

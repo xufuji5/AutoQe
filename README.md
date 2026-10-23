@@ -1,10 +1,15 @@
-# QE Toolkit
+# AutoQe
 
 **Quality Engineering for AI-assisted software development — invariants first, tests second.**
 
+[![CI](https://github.com/xufuji5/AutoQe/actions/workflows/qe.yml/badge.svg)](https://github.com/xufuji5/AutoQe/actions/workflows/qe.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Repository: https://github.com/xufuji5/AutoQe
+
 ## What it is
 
-QE Toolkit turns a team's audit methodology into executable checkers. Every rule is an **invariant**: a
+AutoQe turns a team's audit methodology into executable checkers. Every rule is an **invariant**: a
 statement that must hold for *every* instance, not just the paths a test happened to enumerate.
 
 The repository has three layers:
@@ -17,7 +22,7 @@ The repository has three layers:
 
 ## What it is **not**
 
-- It is **not** an upgrade pack. If your project already has stronger guards, keep them. QE only supplies
+- It is **not** an upgrade pack. If your project already has stronger guards, keep them. AutoQe only supplies
   questions you may not have asked yet.
 - It is **not** a test generator. It does not replace e2e, contract tests, or load tests.
 - It **does not** claim full coverage. Every guard declares its scope and blind spots, and `open`
@@ -147,7 +152,7 @@ RATCHET status=ok regressions=0 improvements=0 tracked=0
 - Adapters are registered in `qe/lib/providers.ts`. Add a new stack by implementing
   `SchemaProvider` or `CallCollector`; guards do not change.
 
-## Using QE in another repository
+## Using AutoQe in another repository
 
 1. Copy `QE-00`…`QE-09`, `qe/`, `qe.config.json`, `tsconfig.qe.json`, and the `qe:*` scripts.
    Do **not** copy `qe/ratchet.json`, `qe-report/`, or `qe-audit/`.
@@ -156,7 +161,7 @@ RATCHET status=ok regressions=0 improvements=0 tracked=0
 4. Triage existing findings, then freeze the baseline with `npm run qe:ratchet:update`.
 5. Copy `qe/templates/project-audit/` to `qe-audit/<project>-<date>/` and run the `QE-03` playbook.
 
-> Treat QE as an **external checklist**: absorb the questions, not the tool's finding codes or report shape.
+> Treat AutoQe as an **external checklist**: absorb the questions, not the tool's finding codes or report shape.
 > If the host project already has stronger guards, mark the item "already covered" instead of replacing it.
 > See `QE-00` §0 and `qe/templates/project-audit/05-gap-absorption-plan.md`.
 
@@ -202,7 +207,7 @@ npm run typecheck && npm run qe:selftest && npm run qe
 
 ## 中文说明
 
-QE Toolkit 是「不变量优先」的质量工程工具箱：把缺陷拦在设计层，而不是靠用例枚举。内置 27 条不变量、
+AutoQe 是「不变量优先」的质量工程工具箱：把缺陷拦在设计层，而不是靠用例枚举。内置 27 条不变量、
 9 个静态守卫、19 个坏样本自证与只降不升的 ratchet 基线，并提供一套通用的项目体检与上线判定作业单。
 它适合作为**外部体检清单**引入已有项目，**不替代**项目原有的守卫体系；内置 Prisma schema 与 TypeScript AST
 适配器，其他技术栈通过适配器接入。许可证：MIT。
