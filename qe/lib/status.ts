@@ -18,6 +18,7 @@ import type { QeConfig } from './config.ts'
 import type { GuardReadout } from './report.ts'
 import type { RatchetComparison } from './ratchet.ts'
 import type { Invariant } from '../registry/types.ts'
+import type { Locale } from './triage.ts'
 
 export interface BatchSummary {
   /** 相对 root 的目录 */
@@ -123,7 +124,9 @@ export function decideStatus(input: {
   batches: BatchSummary[]
   today: string
   auditDir: string
+  locale?: Locale
 }): StatusVerdict {
+  const zh = input.locale === 'zh'
   const errors = input.readouts.reduce((n, r) => n + countByLevel(r.findings, 'error'), 0)
   const regressions = input.ratchet.regressions.length
   const dueInvariants = input.registry
@@ -133,14 +136,16 @@ export function decideStatus(input: {
   const skipped = input.readouts.filter((r) => r.skipped)
 
   const residuals = [
-    ...open.map((i) => `${i.id} open：${i.openReason ?? '无理由'}`),
-    ...skipped.map((r) => `${r.guard} skipped：${r.skipped}`),
+    ...open.map((i) => `${i.id} open${zh ? '：' : ': '}${i.openReason ?? (zh ? '无理由' : 'no reason')}`),
+    ...skipped.map((r) => `${r.guard} skipped${zh ? '：' : ': '}${r.skipped}`),
   ]
 
   if (errors > 0 || regressions > 0) {
     return {
       decision: 'REPAIR',
-      reason: `guards error=${errors}, ratchet regressions=${regressions}：先修复，再谈是否继续挖`,
+      reason: zh
+        ? `guards error=${errors}, ratchet regressions=${regressions}：先修复，再谈是否继续挖`
+        : `guards error=${errors}, ratchet regressions=${regressions}: repair first, then decide whether to keep mining`,
       dueInvariants,
       residuals,
     }
@@ -148,7 +153,9 @@ export function decideStatus(input: {
   if (dueInvariants.length > 0) {
     return {
       decision: 'ADJUDICATE',
-      reason: `open 不变量已到复审期：${dueInvariants.join(', ')}（逾期不裁决，open 就变成挂账）`,
+      reason: zh
+        ? `open 不变量已到复审期：${dueInvariants.join(', ')}（逾期不裁决，open 就变成挂账）`
+        : `open invariants are past their review date: ${dueInvariants.join(', ')} (an overdue open item is an unowned liability)`,
       dueInvariants,
       residuals,
     }
@@ -158,7 +165,9 @@ export function decideStatus(input: {
   if (judged.length === 0) {
     return {
       decision: 'INSUFFICIENT-HISTORY',
-      reason: `没有可判的批次台账（${input.auditDir} 下找不到 03-bug-ledger.md）：空集不能证明「可以继续」`,
+      reason: zh
+        ? `没有可判的批次台账（${input.auditDir} 下找不到 03-bug-ledger.md）：空集不能证明「可以继续」`
+        : `no judgeable batch ledger (no 03-bug-ledger.md under ${input.auditDir}): an empty set cannot prove 'keep going'`,
       dueInvariants,
       residuals,
     }
@@ -166,7 +175,9 @@ export function decideStatus(input: {
   if (judged.length === 1) {
     return {
       decision: 'INSUFFICIENT-HISTORY',
-      reason: `只有 1 批可判（${judged[0].dir} trueHoles=${judged[0].trueHoles}）：持续两批的判据还不成立`,
+      reason: zh
+        ? `只有 1 批可判（${judged[0].dir} trueHoles=${judged[0].trueHoles}）：持续两批的判据还不成立`
+        : `only 1 judgeable batch (${judged[0].dir} trueHoles=${judged[0].trueHoles}): the two-batch criterion is not met yet`,
       dueInvariants,
       residuals,
     }
@@ -177,30 +188,45 @@ export function decideStatus(input: {
   if (last.trueHoles < 1 && prev.trueHoles < 1) {
     return {
       decision: 'STOP-MINING',
-      reason: `最近两批真洞产出 ${prev.trueHoles} / ${last.trueHoles}（<1 且持续两批）：停止新增审计批，转运行态布网`,
+      reason: zh
+        ? `最近两批真洞产出 ${prev.trueHoles} / ${last.trueHoles}（<1 且持续两批）：停止新增审计批，转运行态布网`
+        : `last two batches yielded ${prev.trueHoles} / ${last.trueHoles} true holes (<1 for two batches): stop new audit batches, move to runtime coverage`,
       dueInvariants,
       residuals,
     }
   }
   return {
     decision: 'CONTINUE-MINING',
-    reason: `最近两批真洞产出 ${prev.trueHoles} / ${last.trueHoles}：产出曲线还没到终点`,
+    reason: zh
+      ? `最近两批真洞产出 ${prev.trueHoles} / ${last.trueHoles}：产出曲线还没到终点`
+      : `last two batches yielded ${prev.trueHoles} / ${last.trueHoles}: the yield curve has not flattened yet`,
     dueInvariants,
     residuals,
   }
 }
 
-export function nextStepFor(decision: StatusDecision, cli = 'npx autoqe'): string {
+export function nextStepFor(decision: StatusDecision, cli = 'npx autoqe', locale: Locale = 'en', rootArg = ''): string {
+  const zh = locale === 'zh'
   switch (decision) {
     case 'REPAIR':
-      return `先跑 ${cli} run --root . --verbose，修掉 error 与 ratchet 回归；不要新增审计批`
+      return zh
+        ? `先跑 ${cli} run${rootArg} --verbose，修掉 error 与 ratchet 回归；不要新增审计批`
+        : `run ${cli} run${rootArg} --verbose and clear errors and ratchet regressions first; do not open a new audit batch`
     case 'ADJUDICATE':
-      return '逐条裁决到期的 open 不变量：升 enforced / 续期并写理由 / 转运行态补偿'
+      return zh
+        ? '逐条裁决到期的 open 不变量：升 enforced / 续期并写理由 / 转运行态补偿'
+        : 'adjudicate each due open invariant: promote to enforced / renew with a written reason / compensate at runtime'
     case 'STOP-MINING':
-      return '切换到运行态布网：对账不变量 + 告警通道自检 + 灰度放量；见 QE-03 §10.1'
+      return zh
+        ? '切换到运行态布网：对账不变量 + 告警通道自检 + 灰度放量；见 QE-03 §10.1'
+        : 'switch to runtime coverage: reconciliation invariants + alert-channel self-check + staged rollout (QE-03 §10.1)'
     case 'CONTINUE-MINING':
-      return `继续下一批 QE-03 审计；每批结束跑 ${cli} status 记录真洞产出`
+      return zh
+        ? `继续下一批 QE-03 审计；每批结束跑 ${cli} status 记录真洞产出`
+        : `open the next QE-03 audit batch; run ${cli} status after each batch to record the true-hole yield`
     case 'INSUFFICIENT-HISTORY':
-      return '先按 QE-03 跑一批审计，把 03-bug-ledger.md 放进 qe-audit/<project>-<date>/；至少两批后本判据才生效'
+      return zh
+        ? '先按 QE-03 跑一批审计，把 03-bug-ledger.md 放进 qe-audit/<project>-<date>/；至少两批后本判据才生效'
+        : 'run one QE-03 audit batch and drop 03-bug-ledger.md into qe-audit/<project>-<date>/; this criterion needs at least two batches'
   }
 }

@@ -45,6 +45,7 @@ const CONFIG_TEMPLATE = (opts: { schemaPath: string | null; sourceRoots: string[
       guardsDir: 'qe/guards',
       packageJson: 'package.json',
       ledger: 'qe/ledger/incidents.json',
+      waivers: 'qe/waivers.json',
       auditDir: 'qe-audit',
       locale: 'en',
       metaGuards: false,
@@ -134,6 +135,15 @@ export async function initProject(root: string, opts: InitOptions = {}): Promise
   } else {
     await writeFile(contractsPath, `${JSON.stringify({ promises: [], gates: [] }, null, 2)}\n`, 'utf8')
     created.push(contractsPath)
+  }
+
+  const waiversPath = path.join(root, 'qe', 'waivers.json')
+  if (!force && (await exists(waiversPath))) {
+    skipped.push(waiversPath)
+  } else {
+    await mkdir(path.dirname(waiversPath), { recursive: true })
+    await writeFile(waiversPath, '[]\n', 'utf8')
+    created.push(waiversPath)
   }
 
   for (const name of await readdir(PACKAGE_ROOT)) {

@@ -118,8 +118,86 @@ export async function loadIncidentMetrics(root: string, config: QeConfig, regist
 }
 
 function renderMarkdown(input: ReportInput, m: Metrics): string {
-  const now = new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
-  const statusText = m.status === 'green' ? '绿' : m.status === 'yellow' ? '黄（有告警）' : '红'
+  const zh = input.config.locale !== 'en'
+  const t = zh
+    ? {
+        title: 'AI 质量工程跑批报告',
+        generated: '生成时间',
+        conclusion: '结论',
+        adapters: '适配器',
+        repro: '复现命令',
+        health: '健康指标',
+        metric: '指标',
+        reading: '读数',
+        criterion: '判据',
+        invariants: '不变量条目',
+        invCriterion: '稳定态 20–30 条，新增缺陷多数落旧条目',
+        coverage: '守卫反证覆盖率',
+        coverageCriterion: '=100%，缺一降级',
+        zeroWriter: '零写入列',
+        zeroWriterCriterion: '→0 并钉住（ratchet 只准变少）',
+        deadEnum: '死枚举值',
+        deadEnumCriterion: '→0 并钉住',
+        incidentRate: '新缺陷落旧条目率',
+        notRegistered: '未登记',
+        incidentCriterion: '↑（查表动作多于新开条目）',
+        guards: '守卫读数',
+        guard: '守卫',
+        state: '状态',
+        scope: '射程（自报）',
+        tri: '守卫三态（坏样本反证）',
+        testCase: '用例',
+        expect: '期望',
+        result: '结果',
+        readout: '红/黄读数',
+        open: 'open 条目复审窗口',
+        inv: '不变量',
+        reviewBy: '复审日期',
+        reason: '理由',
+        footer: '读数口径：命令即真源，本报告只是带日期的快照。封面数字与复现输出不符即视为红。',
+        statuses: { green: '绿', yellow: '黄（有告警）', red: '红' },
+      }
+    : {
+        title: 'AI Quality Engineering Run Report',
+        generated: 'Generated',
+        conclusion: 'Conclusion',
+        adapters: 'Adapters',
+        repro: 'Reproduce',
+        health: 'Health metrics',
+        metric: 'Metric',
+        reading: 'Reading',
+        criterion: 'Criterion',
+        invariants: 'Invariant entries',
+        invCriterion: 'steady state is 20–30; new defects should mostly land on old entries',
+        coverage: 'Guard counter-proof coverage',
+        coverageCriterion: '=100%; any gap is a downgrade',
+        zeroWriter: 'Zero-writer columns',
+        zeroWriterCriterion: '→0 and pinned (ratchet may only shrink)',
+        deadEnum: 'Dead enum values',
+        deadEnumCriterion: '→0 and pinned',
+        incidentRate: 'New defects landing on old entries',
+        notRegistered: 'not registered',
+        incidentCriterion: '↑ (lookup before opening a new entry)',
+        guards: 'Guard readings',
+        guard: 'Guard',
+        state: 'State',
+        scope: 'Scope (self-reported)',
+        tri: 'Guard three-state (bad-sample counter-proof)',
+        testCase: 'Case',
+        expect: 'Expect',
+        result: 'Result',
+        readout: 'red/yellow readout',
+        open: 'Open items review window',
+        inv: 'Invariant',
+        reviewBy: 'Review by',
+        reason: 'Reason',
+        footer: 'Reading principle: the command is the source of truth; this report is a dated snapshot. Numbers here that disagree with a fresh run are red.',
+        statuses: { green: 'green', yellow: 'yellow (warnings)', red: 'red' },
+      }
+  const now = new Date().toLocaleString(zh ? 'zh-CN' : 'en-GB', { timeZone: 'Asia/Shanghai' })
+  const sep = zh ? '：' : ': '
+  const br = (s: string): string => (zh ? `（${s}）` : ` (${s})`)
+  const statusText = t.statuses[m.status]
   const guardRows = input.readouts
     .map((r) => {
       const e = r.findings.filter((f) => f.level === 'error').length
@@ -137,41 +215,41 @@ function renderMarkdown(input: ReportInput, m: Metrics): string {
     .map((i) => `| ${i.id} | ${i.revisitBy} | ${i.openReason ?? ''} |`)
     .join('\n')
 
-  return `# AI 质量工程跑批报告
+  return `# ${t.title}
 
-- 生成时间：${now}
-- 结论：**${statusText}**（errors=${m.errors} warnings=${m.warnings} skipped=${m.skipped} selftest=${m.selftest.passed}/${m.selftest.cases}）
-- 适配器：schema=${input.config.schema.provider} / collector=${input.config.source.collector}
-- 复现命令：\`npm run qe:report\`
+- ${t.generated}${sep}${now}
+- ${t.conclusion}${sep}**${statusText}**${br(`errors=${m.errors} warnings=${m.warnings} skipped=${m.skipped} selftest=${m.selftest.passed}/${m.selftest.cases}`)}
+- ${t.adapters}${sep}schema=${input.config.schema.provider} / collector=${input.config.source.collector}
+- ${t.repro}${sep}\`npm run qe:report\`
 
-## 健康指标
+## ${t.health}
 
-| 指标 | 读数 | 判据 |
+| ${t.metric} | ${t.reading} | ${t.criterion} |
 |---|---|---|
-| 不变量条目 | ${m.invariants.total}（enforced ${m.invariants.enforced} / partial ${m.invariants.partial} / open ${m.invariants.open}） | 稳定态 20–30 条，新增缺陷多数落旧条目 |
-| 守卫反证覆盖率 | ${m.enforcedCoverage}%（${m.enforcedCovered}/${m.invariants.enforced}） | =100%，缺一降级 |
-| 零写入列 | ${m.zeroWriter} | →0 并钉住（ratchet 只准变少） |
-| 死枚举值 | ${m.deadEnum} | →0 并钉住 |
-| 新缺陷落旧条目率 | ${m.incidents.rate === null ? '未登记' : m.incidents.rate + '%'}（${m.incidents.matched}/${m.incidents.total}） | ↑（查表动作多于新开条目） |
+| ${t.invariants} | ${m.invariants.total}${br(`enforced ${m.invariants.enforced} / partial ${m.invariants.partial} / open ${m.invariants.open}`)} | ${t.invCriterion} |
+| ${t.coverage} | ${m.enforcedCoverage}%${br(`${m.enforcedCovered}/${m.invariants.enforced}`)} | ${t.coverageCriterion} |
+| ${t.zeroWriter} | ${m.zeroWriter} | ${t.zeroWriterCriterion} |
+| ${t.deadEnum} | ${m.deadEnum} | ${t.deadEnumCriterion} |
+| ${t.incidentRate} | ${m.incidents.rate === null ? t.notRegistered : m.incidents.rate + '%'}${br(`${m.incidents.matched}/${m.incidents.total}`)} | ${t.incidentCriterion} |
 
-## 守卫读数
+## ${t.guards}
 
-| 守卫 | 状态 | errors | warnings | 射程（自报） |
+| ${t.guard} | ${t.state} | errors | warnings | ${t.scope} |
 |---|---|---|---|---|
 ${guardRows || '| - | - | - | - | - |'}
 
-## 守卫三态（坏样本反证）
+## ${t.tri}
 
-| 守卫 | 用例 | 期望 | 结果 | 红/黄读数 |
+| ${t.guard} | ${t.testCase} | ${t.expect} | ${t.result} | ${t.readout} |
 |---|---|---|---|---|
 ${stRows || '| - | - | - | - | - |'}
 
-## open 条目复审窗口
+## ${t.open}
 
-| 不变量 | 复审日期 | 理由 |
+| ${t.inv} | ${t.reviewBy} | ${t.reason} |
 |---|---|---|
 ${openDue || '| - | - | - |'}
 
-> 读数口径：命令即真源，本报告只是带日期的快照。封面数字与复现输出不符即视为红。
+> ${t.footer}
 `
 }

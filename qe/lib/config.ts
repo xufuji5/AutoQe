@@ -28,6 +28,8 @@ export interface QeConfig {
   guardsDir: string
   packageJson: string
   ledger: string
+  /** 备案载体：record 级发现的理由 + 复审日期；过期即失效（不再压制发现） */
+  waivers: string
   /** 审计批次工作区（QE-03 产物），status 用它计算真洞产出曲线 */
   auditDir: string
   /** 面向人读的输出语言（triage 报告与提示词）；机器读数行始终英文 */
@@ -61,6 +63,7 @@ export const defaultConfig: QeConfig = {
   guardsDir: 'qe/guards',
   packageJson: 'package.json',
   ledger: 'qe/ledger/incidents.json',
+  waivers: 'qe/waivers.json',
   auditDir: 'qe-audit',
   locale: 'en',
   metaGuards: true,

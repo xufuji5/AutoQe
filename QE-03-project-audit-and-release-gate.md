@@ -364,12 +364,14 @@ actor (human or AI) never has to invent a priority:
 |---|---|---|---|
 | **fix** | one mechanically correct action exists | the tool, or anyone | exact action; `--apply` only for additive, reversible edits (guard aliases) |
 | **decide** | 2–3 defensible options with different trade-offs | a human | recommended option + alternatives |
-| **record** | does not affect runtime; only traceability is missing | nobody | waiver draft: reason + `reviewBy` |
+| **record** | does not affect runtime; only traceability is missing | nobody | waiver: reason + `reviewBy` written into `qe/waivers.json` |
 
 ```bash
 npx autoqe triage --root .
-# TRIAGE actionable=3 fix=1 decide=2 record=0 skipped=0
-# TRIAGE_TODAY 1) [ALIAS_MISSING] ...
+# TRIAGE actionable=3 fix=1 decide=2 record=0 waived=0 waiverIssues=0 skipped=0
+# TRIAGE_TODAY 1) [MUTATION_NO_IDEMPOTENCY] impact=money effort=L ...
+npx autoqe triage --from-report qe-report/qe-report.json   # same judgment over an existing report
+npx autoqe waive UNWIRED_SCRIPT --reason "kept for ops" --review-by 2026-12-31
 ```
 
 Rules that make the layer trustworthy:
@@ -377,8 +379,14 @@ Rules that make the layer trustworthy:
 1. **Unknown codes are `decide`, never `record`.** An unregistered finding cannot be silently waived.
 2. **`fix` means one answer.** If two reasonable actions exist, it is `decide` — even if one looks obvious.
 3. **`record` never hides a runtime risk.** It is for traceability gaps (unwired scripts, orphan guards), not for defects.
-4. **The today list is capped (5).** The point is a short, finishable queue, not a second backlog.
+4. **The today list is capped (5) and ordered by ROI.** Findings sort by disposition, then impact
+   (`money` > `auth`/`pii` > `data` > `trace`), then effort (`S` < `M` < `L`), so the queue starts with the
+   expensive-to-ignore, cheap-to-fix items.
 5. **Zero findings ≠ safe.** `skipped` and scanned-object counts are printed next to the result; an empty set never prints a pass.
+6. **A waiver is a dated liability, not a delete key.** It suppresses a finding only while its entry carries a
+   reason and an unexpired `reviewBy`; the suppressed finding still shows as `TRIAGE_WAIVED`. An expired entry
+   suppresses nothing and surfaces as `WAIVER_EXPIRED`; a malformed one is `WAIVER_INVALID` and suppresses
+   nothing. There is no permanent waiver.
 
 The policy table is a single source in `qe/lib/triage.ts`; `npm run test:triage` fails when a guard emits
 a code without a disposition, so the judgment layer cannot silently fall behind the guard layer.

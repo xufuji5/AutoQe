@@ -11,7 +11,18 @@ import { runSelfTest } from './lib/selftest.ts'
 import { loadIncidentMetrics, writeReport } from './lib/report.ts'
 import { compareRatchet, ratchetLine, writeBaseline } from './lib/ratchet.ts'
 import { decideStatus, nextStepFor, readBatches } from './lib/status.ts'
-import { applyPackageAliases, triage, triageLines, writeTriage, type Locale } from './lib/triage.ts'
+import {
+  addWaiver,
+  applyPackageAliases,
+  loadWaivers,
+  POLICIES,
+  readExternalFindings,
+  todayIso,
+  triage,
+  triageLines,
+  writeTriage,
+  type Locale,
+} from './lib/triage.ts'
 import { initProject } from './lib/init.ts'
 import type { GuardReadout } from './lib/report.ts'
 import type { Guard } from './lib/guard.ts'
@@ -34,6 +45,14 @@ function cliHint(): string {
   return rel && !rel.startsWith('..') ? `node ${rel}` : `node ${entry}`
 }
 
+/** NEXT 行必须能直接粘回去跑：root 不是当前目录时补 --root，否则命令会打在错的仓上 */
+function rootArg(): string {
+  const cwd = path.resolve(process.cwd())
+  if (root === cwd) return ''
+  const rel = path.relative(cwd, root).split(path.sep).join('/')
+  return ` --root "${rel && !rel.startsWith('..') ? rel : root.replace(/\\/g, '/')}"`
+}
+
 void main()
 
 async function main(): Promise<void> {
@@ -46,6 +65,7 @@ async function main(): Promise<void> {
     else if (command === 'doctor') await cmdDoctor()
     else if (command === 'status') await cmdStatus()
     else if (command === 'triage') await cmdTriage()
+    else if (command === 'waive') await cmdWaive()
     else if (command === 'explain') cmdExplain()
     else if (command === 'prompt') await cmdPrompt()
     else if (command === 'selftest') await cmdSelftest()
@@ -54,7 +74,7 @@ async function main(): Promise<void> {
     else if (command === 'list') cmdList()
     else {
       console.error(
-        `QE_FATAL unknown command: ${command} (available: help / init / doctor / status / triage / run / explain / prompt / report / list / selftest / ratchet-update)`,
+        `QE_FATAL unknown command: ${command} (available: help / init / doctor / status / triage / waive / run / explain / prompt / report / list / selftest / ratchet-update)`,
       )
       process.exitCode = 2
     }
@@ -75,6 +95,7 @@ GETTING STARTED
   autoqe doctor                check Node/config/schema/sources/baseline and print the next step
   autoqe status                stop-or-continue verdict from batch output + open gaps + ratchet
   autoqe triage                sort findings into fix / decide / record and write qe-report/triage.md
+  autoqe waive CODE            add a waiver (reason + reviewBy required) to qe/waivers.json
   autoqe scan                  run all guards and write qe-report/qe-report.md in one shot
   autoqe run --root .          run all guards
   autoqe explain INV-CORE-01   explain one invariant (or a guard id such as inv22)
@@ -92,7 +113,14 @@ OPTIONS
   --verbose        print blind spots and info-level findings
   --json           machine-readable output (explain, list)
   --apply          with triage: apply mechanical, additive fixes only (package aliases)
-  --lang <en|zh>   human-facing output language for triage (default: config.locale, else en)
+  --from <json>    with triage: read findings from a file instead of running guards
+  --from-report <json>
+                   with triage: read the guards block of a qe-report.json
+  --reason <text>  with waive: why this finding is intentionally left alone (required)
+  --review-by <date>
+                   with waive: YYYY-MM-DD when the waiver must be re-adjudicated (required)
+  --scope <path>   with waive: only suppress findings under this path prefix
+  --lang <en|zh>   human-facing output language for triage / status / report (default: config.locale, else en)
   --force          overwrite files during init
   --help           show this help
 
@@ -118,7 +146,7 @@ async function cmdInit(): Promise<void> {
   }
   console.log(`NOTE source.roots=${result.sourceRoots.join(',')} (edit qe.config.json if your code lives elsewhere)`)
   console.log('NEXT 1) edit qe.config.json: schema.path / source.roots / boundaries.publicRoutes / stores.moduleRoots')
-  console.log(`NEXT 2) ${cli} run --root .`)
+  console.log(`NEXT 2) ${cli} run${rootArg()}`)
   console.log('NEXT 3) give AGENTS.md + QE-00-index.md to your AI agent and run the audit per QE-03')
 }
 
@@ -175,6 +203,21 @@ async function cmdDoctor(): Promise<void> {
     }
   }
 
+  const waiversFile = path.resolve(root, config.waivers)
+  if (!existsSync(waiversFile)) {
+    rows.push(`OK   waivers ${config.waivers} none (created by \`${cli} waive <CODE> --reason ... --review-by ...\`)`)
+  } else {
+    try {
+      const store = await loadWaivers(root, config)
+      const state = store.issues.length > 0 ? 'WARN' : 'OK  '
+      rows.push(
+        `${state} waivers ${config.waivers} entries=${store.waivers.length} invalid=${store.issues.length}${store.issues.length > 0 ? ' -> fix or delete those entries; they suppress nothing' : ''}`,
+      )
+    } catch (e) {
+      rows.push(`FAIL waivers ${config.waivers} ${(e as Error).message}`)
+    }
+  }
+
   const ratchetFile = path.join(root, 'qe', 'ratchet.json')
   const hasRatchet = existsSync(ratchetFile)
   rows.push(`${hasRatchet ? 'OK  ' : 'WARN'} ratchet ${hasRatchet ? 'qe/ratchet.json' : 'missing -> npx autoqe ratchet-update'}`)
@@ -185,26 +228,27 @@ async function cmdDoctor(): Promise<void> {
   )
 
   console.log(rows.join('\n'))
-  console.log(`NEXT ${cli} run --root .`)
+  console.log(`NEXT ${cli} run${rootArg()}`)
   console.log(`     ${cli} explain INV-CORE-01`)
-  console.log(`     ${cli} prompt audit --root . > prompt.txt`)
+  console.log(`     ${cli} prompt audit${rootArg()} > prompt.txt`)
   if (!nodeOk || !hasConfig) process.exitCode = 1
 }
 
 async function cmdStatus(): Promise<void> {
   const config = await loadConfig(root)
+  const locale: Locale = (typeof flags.lang === 'string' ? flags.lang : config.locale) === 'zh' ? 'zh' : 'en'
   const readouts = await execute(true)
   const ratchet = await compareRatchet(root, readouts)
   const batches = await readBatches(root, config)
   const incidents = await loadIncidentMetrics(root, config, registry)
   const today = new Date().toLocaleDateString('sv-SE')
-  const verdict = decideStatus({ registry, readouts, ratchet, batches, today, auditDir: config.auditDir })
+  const verdict = decideStatus({ registry, readouts, ratchet, batches, today, auditDir: config.auditDir, locale })
   const errors = readouts.reduce((n, r) => n + countByLevel(r.findings, 'error'), 0)
   const warnings = readouts.reduce((n, r) => n + countByLevel(r.findings, 'warn'), 0)
   const skipped = readouts.filter((r) => r.skipped)
   const byStatus = (status: string): number => registry.filter((i) => i.status === status).length
   const openIds = registry.filter((i) => i.status === 'open').map((i) => i.id)
-  const next = nextStepFor(verdict.decision, cli)
+  const next = nextStepFor(verdict.decision, cli, locale, rootArg())
 
   if (flags.json === true) {
     console.log(
@@ -261,7 +305,7 @@ async function cmdStatus(): Promise<void> {
     `READING ${batchText}`,
     `DECISION ${verdict.decision} reason="${verdict.reason}"`,
     `RESIDUAL open=${openIds.length} [${openText}] skipped=${skipped.length}`,
-    ...skipped.map((r) => `RESIDUAL skipped ${r.guard}：${r.skipped}`),
+    ...skipped.map((r) => `RESIDUAL skipped ${r.guard}${locale === 'zh' ? '：' : ': '}${r.skipped}`),
     `NEXT ${next}`,
   ]
   console.log(lines.join('\n'))
@@ -270,24 +314,56 @@ async function cmdStatus(): Promise<void> {
 
 async function cmdTriage(): Promise<void> {
   const config = await loadConfig(root)
-  const readouts = await execute(true)
+  const external = typeof flags['from-report'] === 'string' ? flags['from-report'] : typeof flags.from === 'string' ? flags.from : undefined
+  const readouts = external ? await readExternalFindings(path.resolve(root, external)) : await execute(true)
   let applied: string[] = []
-  if (flags.apply === true) {
+  if (flags.apply === true && !external) {
     applied = await applyPackageAliases(root, config, registry)
   }
-  const result = triage(readouts)
+  const { waivers, issues } = await loadWaivers(root, config)
+  const result = triage(readouts, { waivers, waiverIssues: issues, waiverFile: config.waivers })
   const locale: Locale = (typeof flags.lang === 'string' ? flags.lang : config.locale) === 'zh' ? 'zh' : 'en'
+  if (external) console.log(`TRIAGE_SOURCE file=${path.relative(root, path.resolve(root, external))} readouts=${readouts.length}`)
   for (const line of triageLines(result, locale)) console.log(line)
-  if (flags.apply === true) {
+  if (flags.apply === true && external) {
+    console.log('TRIAGE_NOTE apply-skipped: --apply needs the live guards; external findings are judged read-only')
+  }
+  if (flags.apply === true && !external) {
     console.log(`TRIAGE_APPLIED aliases=${applied.length}${applied.length ? ' [' + applied.join(',') + ']' : ''}`)
   }
   const { jsonFile, mdFile } = await writeTriage(root, result, readouts, applied, cli, locale)
   console.log(`TRIAGE_REPORT json=${path.relative(root, jsonFile)} md=${path.relative(root, mdFile)}`)
   const next =
     locale === 'zh'
-      ? `TRIAGE_NEXT ${result.fix + result.decide > 0 ? `从「今天只做这些」开始，处置完跑 ${cli} triage 复核` : `没有待办；用 ${cli} run --root . 做一次全量复核`}`
-      : `TRIAGE_NEXT ${result.fix + result.decide > 0 ? `start from "Today's list"; re-run ${cli} triage after the batch` : `nothing actionable; re-check with ${cli} run --root .`}`
+      ? `TRIAGE_NEXT ${result.fix + result.decide > 0 ? `从「今天只做这些」开始，处置完跑 ${cli} triage${rootArg()} 复核` : `没有待办；用 ${cli} run${rootArg()} 做一次全量复核`}`
+      : `TRIAGE_NEXT ${result.fix + result.decide > 0 ? `start from "Today's list"; re-run ${cli} triage${rootArg()} after the batch` : `nothing actionable; re-check with ${cli} run${rootArg()}`}`
   console.log(next)
+}
+
+async function cmdWaive(): Promise<void> {
+  const code = positional[0]
+  if (!code) {
+    console.error('QE_FATAL waive needs a finding code: autoqe waive ZERO_WRITER --reason "..." --review-by YYYY-MM-DD')
+    process.exitCode = 2
+    return
+  }
+  const config = await loadConfig(root)
+  const { file, waiver } = await addWaiver(root, config, {
+    code,
+    reason: typeof flags.reason === 'string' ? flags.reason : '',
+    reviewBy: typeof flags['review-by'] === 'string' ? flags['review-by'] : '',
+    scope: typeof flags.scope === 'string' ? flags.scope : undefined,
+    today: todayIso(),
+  })
+  console.log(
+    `WAIVE_ADDED code=${waiver.code} reviewBy=${waiver.reviewBy}${waiver.scope ? ' scope=' + waiver.scope : ''} file=${path.relative(root, file)}`,
+  )
+  if (!POLICIES[code]) {
+    console.log(
+      `WAIVE_WARN code=${code} is not a registered disposition: triage keeps treating it as decide, and the waiver only suppresses if a guard emits this exact code`,
+    )
+  }
+  console.log(`NEXT ${cli} triage${rootArg()}   # the finding stays visible as TRIAGE_WAIVED until reviewBy passes`)
 }
 
 function cmdExplain(): void {
@@ -470,6 +546,7 @@ async function cmdReport(): Promise<void> {
   const selected = selectGuards()
   const selftest = await runSelfTest(selected, registry)
   const config = await loadConfig(root)
+  if (typeof flags.lang === 'string') config.locale = flags.lang === 'zh' ? 'zh' : 'en'
   const readouts: GuardReadout[] = []
   for (const guard of selected) {
     try {

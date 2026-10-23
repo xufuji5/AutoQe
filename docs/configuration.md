@@ -29,6 +29,7 @@ next command to run.
   "guardsDir": "qe/guards",
   "packageJson": "package.json",
   "ledger": "qe/ledger/incidents.json",
+  "waivers": "qe/waivers.json",
   "metaGuards": false
 }
 ```
@@ -138,8 +139,9 @@ name, so an obfuscated key escapes the check — name persisted keys literally.
 | `guardsDir` | `qe/guards` | Where local guards live, used by `inv13` |
 | `packageJson` | `package.json` | Manifest checked for guard aliases (`inv13`) |
 | `ledger` | `qe/ledger/incidents.json` | Incident ledger read by the report |
+| `waivers` | `qe/waivers.json` | Waiver store read by `triage`: a finding is suppressed only while its entry has a reason and a `reviewBy` that has not passed |
 | `auditDir` | `qe-audit` | Batch workspace read by `autoqe status` (expects `<batch>/03-bug-ledger.md`) |
-| `locale` | `en` | Language of the human-facing `triage` report (`en` / `zh`); machine readings stay English |
+| `locale` | `en` | Language of the human-facing output — `triage`, `status` reasons, `qe-report.md` (`en` / `zh`); machine readings stay English |
 | `metaGuards` | `true` | Whether to audit this repo's own guard wiring (`inv13`) |
 
 **`metaGuards` is `false` in CLI mode.** When guards live in `node_modules/autoqe`, the host has no
@@ -170,6 +172,41 @@ Then `npx autoqe doctor` — each root must print `files>0`.
 ```json
 "fieldExemptions": [{ "model": "Invoice", "field": "pdfPath", "reason": "written by the PDF worker in services/pdf" }]
 ```
+
+### Record a finding as knowingly accepted (and make it expire)
+
+A waiver suppresses a finding, but only while it is valid. Never edit the file by hand — the CLI rejects
+empty reasons and dates in the past:
+
+```bash
+npx autoqe waive ZERO_WRITER --reason "column kept for a migration window" --review-by 2026-12-31
+npx autoqe waive ZERO_WRITER --reason "legacy area only" --review-by 2026-12-31 --scope src/legacy
+```
+
+The entry lands in `qe/waivers.json`:
+
+```json
+[{ "code": "ZERO_WRITER", "reason": "column kept for a migration window", "reviewBy": "2026-12-31", "addedAt": "2026-10-23" }]
+```
+
+Behaviour is deliberately asymmetric: a valid waiver removes the finding from the three buckets but keeps it
+visible as `TRIAGE_WAIVED`; an expired one suppresses nothing and turns itself into a `WAIVER_EXPIRED`
+decide item; an entry with no reason or an unparseable `reviewBy` is `WAIVER_INVALID` and suppresses nothing.
+There is no "permanent waiver" state.
+
+### Triage findings produced elsewhere
+
+`triage` does not have to run the guards itself. Point it at a JSON file — a previous report, another
+scanner's export, or a hand-written list:
+
+```bash
+npx autoqe triage --from qe-report/qe-report.json        # { "guards": [...] } is auto-detected
+npx autoqe triage --from-report qe-report/qe-report.json # same file, explicit report shape
+npx autoqe triage --from findings.json                   # Finding[] or { "findings": [...] }
+```
+
+Malformed entries abort with the offending index (`…findings[3]: level must be error / warn / info`).
+Silently dropping them would turn a red reading green, so the loader refuses instead.
 
 ### Make a route public (and stay honest about it)
 

@@ -18,6 +18,8 @@ import type { Invariant } from '../registry/types.ts'
  */
 export type Disposition = 'fix' | 'decide' | 'record'
 export type Locale = 'en' | 'zh'
+export type Impact = 'money' | 'auth' | 'pii' | 'data' | 'trace'
+export type Effort = 'S' | 'M' | 'L'
 
 export interface L10n {
   en: string
@@ -32,6 +34,8 @@ export interface Policy {
   action: L10n
   options?: L10n[]
   auto?: 'package-alias'
+  impact?: Impact
+  effort?: Effort
 }
 
 export const POLICIES: Record<string, Policy> = {
@@ -543,11 +547,118 @@ const UNKNOWN_POLICY: Policy = {
   ],
 }
 
+POLICIES.WAIVER_EXPIRED = {
+  disposition: 'decide',
+  meaning: L(
+    'A waiver passed its review date but is still suppressing a finding.',
+    '备案已过复审日期，却仍在压制一条发现。',
+  ),
+  action: L('Re-adjudicate now: fix it, renew the waiver, or delete the entry.', '现在重新裁决：修掉、续期或删条目。'),
+  options: [
+    L('A Fix the finding and remove the waiver (recommended)', 'A 修掉发现并删除备案（推荐）'),
+    L('B Renew with a new review date and a written justification', 'B 续期：写新的复审日期与续期理由'),
+  ],
+  impact: 'trace',
+  effort: 'S',
+}
+
+POLICIES.WAIVER_INVALID = {
+  disposition: 'decide',
+  meaning: L(
+    'A waiver entry is missing a reason or a valid reviewBy date, so it cannot suppress anything.',
+    '备案条目缺理由或复审日期非法，因此不能压制任何发现。',
+  ),
+  action: L('Fix the waiver entry or delete it.', '修正该备案条目或删除它。'),
+  options: [
+    L('A Complete reason + reviewBy (recommended)', 'A 补全理由 + 复审日期（推荐）'),
+    L('B Delete the malformed entry', 'B 删除这条非法条目'),
+  ],
+  impact: 'trace',
+  effort: 'S',
+}
+
+/**
+ * 影响面与成本的单源补充表。未列出的代码按 trace / M 处理。
+ * Impact/effort for codes where the default (trace / M) understates the risk.
+ */
+export const POLICY_META: Record<string, { impact: Impact; effort: Effort }> = {
+  MUTATION_NO_IDEMPOTENCY: { impact: 'money', effort: 'L' },
+  ENTRY_NO_AUTH: { impact: 'auth', effort: 'L' },
+  PERSIST_SENSITIVE: { impact: 'pii', effort: 'L' },
+  CLIENT_IMPORTS_SERVER: { impact: 'pii', effort: 'L' },
+  CLIENT_TOUCHES_SERVER: { impact: 'pii', effort: 'M' },
+  PERSIST_WITHOUT_PARTIALIZE: { impact: 'pii', effort: 'M' },
+  PERSIST_FULL_STATE: { impact: 'pii', effort: 'M' },
+  PUBLIC_NO_REASON: { impact: 'auth', effort: 'M' },
+  ENTRY_NO_VALIDATE: { impact: 'data', effort: 'M' },
+  ZERO_WRITER: { impact: 'data', effort: 'M' },
+  DEAD_ENUM: { impact: 'data', effort: 'M' },
+  NO_WRITE_PATH: { impact: 'data', effort: 'M' },
+  AMBIGUOUS_PATH: { impact: 'data', effort: 'M' },
+  GHOST_PROMISE: { impact: 'data', effort: 'M' },
+  GHOST_GATE: { impact: 'data', effort: 'M' },
+  CROSS_MODULE_RELATIVE: { impact: 'data', effort: 'S' },
+  ZERO_READER: { impact: 'trace', effort: 'S' },
+  DEAD_GATE: { impact: 'trace', effort: 'S' },
+  PUBLIC_ROUTE_STALE: { impact: 'trace', effort: 'S' },
+  ALIAS_MISSING: { impact: 'trace', effort: 'S' },
+  PERSIST_NO_VERSION: { impact: 'data', effort: 'S' },
+  WAIVER_EXPIRED: { impact: 'trace', effort: 'S' },
+  WAIVER_INVALID: { impact: 'trace', effort: 'S' },
+}
+
+const IMPACT_WEIGHT: Record<Impact, number> = { money: 5, auth: 4, pii: 4, data: 3, trace: 1 }
+const EFFORT_WEIGHT: Record<Effort, number> = { S: 1, M: 2, L: 3 }
+
+export function metaOf(code: string, policy: Policy): { impact: Impact; effort: Effort } {
+  const meta = POLICY_META[code] ?? { impact: policy.impact ?? 'trace', effort: policy.effort ?? 'M' }
+  return { impact: policy.impact ?? meta.impact, effort: policy.effort ?? meta.effort }
+}
+
 export interface TriageGroup {
   code: string
   level: Finding['level']
   policy: Policy
   findings: Finding[]
+  impact: Impact
+  effort: Effort
+}
+
+/**
+ * 备案条目。载体是 qe/waivers.json（config.waivers）。
+ * 只有 reason 非空 + reviewBy 是合法日期时才算有效；到期后自动失效，不再压制发现。
+ */
+export interface Waiver {
+  code: string
+  reason: string
+  reviewBy: string
+  /** 只压制该路径前缀下的发现；留空表示全仓 */
+  scope?: string
+  addedAt?: string
+}
+
+export interface WaiverIssue {
+  index: number
+  entry: unknown
+  problem: string
+}
+
+export interface WaiverStore {
+  waivers: Waiver[]
+  issues: WaiverIssue[]
+}
+
+export interface WaivedFinding {
+  finding: Finding
+  waiver: Waiver
+}
+
+export interface TriageOptions {
+  waivers?: Waiver[]
+  waiverIssues?: WaiverIssue[]
+  /** 用于判定备案是否到期；默认今天（UTC 日期） */
+  today?: string
+  waiverFile?: string
 }
 
 export interface TriageResult {
@@ -557,27 +668,179 @@ export interface TriageResult {
   record: number
   unknown: string[]
   skipped: number
+  /** 被有效备案压制的发现：不出现在三桶里，但仍在报告里可见 */
+  waived: WaivedFinding[]
+  /** 非法备案条目数（缺理由 / 日期非法） */
+  waiverIssues: number
 }
 
-export function triage(readouts: GuardReadout[]): TriageResult {
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+export function isIsoDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !DATE_RE.test(value)) return false
+  const parsed = new Date(`${value}T00:00:00Z`)
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+}
+
+export function todayIso(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+const waiverFilePath = (root: string, config: QeConfig): string => path.resolve(root, config.waivers)
+
+/** 读备案载体。文件不存在 = 没有备案；JSON 结构不对 = 直接报错，不静默吞掉。 */
+export async function loadWaivers(root: string, config: QeConfig): Promise<WaiverStore> {
+  let raw: string
+  try {
+    raw = await readFile(waiverFilePath(root, config), 'utf8')
+  } catch {
+    return { waivers: [], issues: [] }
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (e) {
+    throw new Error(`${config.waivers} 解析失败：${(e as Error).message}`)
+  }
+  const list = Array.isArray(parsed) ? parsed : (parsed as { waivers?: unknown } | null)?.waivers
+  if (!Array.isArray(list)) throw new Error(`${config.waivers} 必须是数组，或 { "waivers": [...] }`)
+
+  const waivers: Waiver[] = []
+  const issues: WaiverIssue[] = []
+  list.forEach((entry, index) => {
+    if (!entry || typeof entry !== 'object') {
+      issues.push({ index, entry, problem: 'entry is not an object' })
+      return
+    }
+    const candidate = entry as Partial<Waiver>
+    if (typeof candidate.code !== 'string' || !candidate.code.trim()) {
+      issues.push({ index, entry, problem: 'code is missing' })
+      return
+    }
+    if (typeof candidate.reason !== 'string' || !candidate.reason.trim()) {
+      issues.push({ index, entry, problem: 'reason is missing or empty' })
+      return
+    }
+    if (!isIsoDate(candidate.reviewBy)) {
+      issues.push({ index, entry, problem: 'reviewBy is not a valid YYYY-MM-DD date' })
+      return
+    }
+    waivers.push({
+      code: candidate.code.trim(),
+      reason: candidate.reason.trim(),
+      reviewBy: candidate.reviewBy,
+      ...(typeof candidate.scope === 'string' && candidate.scope.trim() ? { scope: candidate.scope.trim() } : {}),
+      ...(typeof candidate.addedAt === 'string' ? { addedAt: candidate.addedAt } : {}),
+    })
+  })
+  return { waivers, issues }
+}
+
+/** 追加一条备案。理由必填、复审日期必须合法且不早于今天；非法条目存在时拒绝写入。 */
+export async function addWaiver(
+  root: string,
+  config: QeConfig,
+  input: { code: string; reason: string; reviewBy: string; scope?: string; today?: string },
+): Promise<{ file: string; waiver: Waiver }> {
+  const code = input.code.trim()
+  if (!code) throw new Error('waive 需要判据代码：autoqe waive ZERO_WRITER --reason "..." --review-by YYYY-MM-DD')
+  if (!input.reason.trim()) throw new Error('waive 必须写理由（--reason）：空理由的备案等同永久豁免槽')
+  if (!isIsoDate(input.reviewBy)) {
+    throw new Error(`--review-by 必须是合法日期 YYYY-MM-DD，收到 "${input.reviewBy}"`)
+  }
+  const today = input.today ?? todayIso()
+  if (input.reviewBy < today) {
+    throw new Error(`--review-by ${input.reviewBy} 早于今天 ${today}：过期备案不压制任何发现`)
+  }
+  const store = await loadWaivers(root, config)
+  if (store.issues.length > 0) {
+    throw new Error(`${config.waivers} 里已有 ${store.issues.length} 条非法条目，先修好再加新备案`)
+  }
+  const waiver: Waiver = {
+    code,
+    reason: input.reason.trim(),
+    reviewBy: input.reviewBy,
+    addedAt: today,
+    ...(input.scope?.trim() ? { scope: input.scope.trim() } : {}),
+  }
+  const file = waiverFilePath(root, config)
+  await mkdir(path.dirname(file), { recursive: true })
+  await writeFile(file, JSON.stringify([...store.waivers, waiver], null, 2) + '\n', 'utf8')
+  return { file, waiver }
+}
+
+export function triage(readouts: GuardReadout[], options: TriageOptions = {}): TriageResult {
+  const today = options.today ?? todayIso()
+  const waiverFile = options.waiverFile ?? 'qe/waivers.json'
   const byCode = new Map<string, TriageGroup>()
+
+  const push = (f: Finding): void => {
+    const policy = POLICIES[f.code] ?? UNKNOWN_POLICY
+    const meta = metaOf(f.code, policy)
+    const group = byCode.get(f.code) ?? {
+      code: f.code,
+      level: f.level,
+      policy,
+      findings: [],
+      impact: meta.impact,
+      effort: meta.effort,
+    }
+    if (f.level === 'error') group.level = 'error'
+    group.findings.push(f)
+    byCode.set(f.code, group)
+  }
+
+  const active: Waiver[] = []
+  const expired: Waiver[] = []
+  for (const w of options.waivers ?? []) (w.reviewBy >= today ? active : expired).push(w)
+  const matches = (w: Waiver, f: Finding): boolean => w.code === f.code && (!w.scope || (f.file ?? '').startsWith(w.scope))
+
+  const waived: WaivedFinding[] = []
   for (const readout of readouts) {
     for (const f of readout.findings) {
       if (f.level === 'info') continue
-      const policy = POLICIES[f.code] ?? UNKNOWN_POLICY
-      const group = byCode.get(f.code) ?? { code: f.code, level: f.level, policy, findings: [] }
-      if (f.level === 'error') group.level = 'error'
-      group.findings.push(f)
-      byCode.set(f.code, group)
+      const hit = active.find((w) => matches(w, f))
+      if (hit) {
+        waived.push({ finding: f, waiver: hit })
+        continue
+      }
+      push(f)
     }
   }
+
+  // 过期备案不再压制，且必须自己冒出来要求复审（没命中的也算）。
+  for (const w of expired) {
+    push({
+      code: 'WAIVER_EXPIRED',
+      level: 'error',
+      file: waiverFile,
+      entity: w.code,
+      message: `waiver for ${w.code} expired on ${w.reviewBy}; it no longer suppresses anything`,
+    })
+  }
+  for (const issue of options.waiverIssues ?? []) {
+    push({
+      code: 'WAIVER_INVALID',
+      level: 'error',
+      file: waiverFile,
+      entity: `entry#${issue.index}`,
+      message: `waiver entry #${issue.index}: ${issue.problem}`,
+    })
+  }
+
   const rank: Record<Disposition, number> = { fix: 0, decide: 1, record: 2 }
   const groups = [...byCode.values()].sort((a, b) => {
-    const diff = rank[a.policy.disposition] - rank[b.policy.disposition]
-    if (diff !== 0) return diff
+    const disposition = rank[a.policy.disposition] - rank[b.policy.disposition]
+    if (disposition !== 0) return disposition
+    const impact = IMPACT_WEIGHT[b.impact] - IMPACT_WEIGHT[a.impact]
+    if (impact !== 0) return impact
+    const effort = EFFORT_WEIGHT[a.effort] - EFFORT_WEIGHT[b.effort]
+    if (effort !== 0) return effort
     if (a.level !== b.level) return a.level === 'error' ? -1 : 1
-    return b.findings.length - a.findings.length
+    if (a.findings.length !== b.findings.length) return b.findings.length - a.findings.length
+    return a.code.localeCompare(b.code)
   })
+
   return {
     groups,
     fix: groups.filter((g) => g.policy.disposition === 'fix').length,
@@ -585,6 +848,8 @@ export function triage(readouts: GuardReadout[]): TriageResult {
     record: groups.filter((g) => g.policy.disposition === 'record').length,
     unknown: groups.filter((g) => !POLICIES[g.code]).map((g) => g.code),
     skipped: readouts.filter((r) => r.skipped).length,
+    waived,
+    waiverIssues: (options.waiverIssues ?? []).length,
   }
 }
 
@@ -594,7 +859,9 @@ export function triageLines(result: TriageResult, locale: Locale = 'en'): string
   const zh = locale === 'zh'
   const lines: string[] = []
   const total = result.fix + result.decide + result.record
-  lines.push(`TRIAGE actionable=${total} fix=${result.fix} decide=${result.decide} record=${result.record} skipped=${result.skipped} locale=${locale}`)
+  lines.push(
+    `TRIAGE actionable=${total} fix=${result.fix} decide=${result.decide} record=${result.record} waived=${result.waived.length} waiverIssues=${result.waiverIssues} skipped=${result.skipped} locale=${locale}`,
+  )
   if (result.skipped > 0) {
     lines.push(
       zh
@@ -615,22 +882,50 @@ export function triageLines(result: TriageResult, locale: Locale = 'en'): string
       .map((f) => (f.file ? `${f.file}${f.line ? ':' + f.line : ''}` : f.entity ?? ''))
       .filter(Boolean)
       .join(', ')
+    const rank = `impact=${g.impact} effort=${g.effort}`
     if (g.policy.disposition === 'fix') {
       const auto = g.policy.auto ? ' auto=yes' : ' auto=no(patch)'
-      lines.push(`TRIAGE_FIX code=${g.code} count=${g.findings.length}${auto} do=${fmt(g.policy.action, locale)}${where ? ' at=' + where : ''}`)
+      lines.push(
+        `TRIAGE_FIX code=${g.code} count=${g.findings.length}${auto} ${rank} do=${fmt(g.policy.action, locale)}${where ? ' at=' + where : ''}`,
+      )
     } else if (g.policy.disposition === 'decide') {
       const options = (g.policy.options ?? []).map((o) => fmt(o, locale)).join(' | ')
       lines.push(
-        `TRIAGE_DECIDE code=${g.code} count=${g.findings.length} recommend=${fmt(g.policy.action, locale)}${options ? ' options=' + options : ''}${where ? ' at=' + where : ''}`,
+        `TRIAGE_DECIDE code=${g.code} count=${g.findings.length} ${rank} recommend=${fmt(g.policy.action, locale)}${options ? ' options=' + options : ''}${where ? ' at=' + where : ''}`,
       )
     } else {
-      lines.push(`TRIAGE_RECORD code=${g.code} count=${g.findings.length} reason=${fmt(g.policy.meaning, locale)}`)
+      lines.push(`TRIAGE_RECORD code=${g.code} count=${g.findings.length} ${rank} reason=${fmt(g.policy.meaning, locale)}`)
     }
   }
+
+  const waivedByCode = new Map<string, { waiver: Waiver; count: number }>()
+  for (const item of result.waived) {
+    const key = `${item.waiver.code}@${item.waiver.reviewBy}@${item.waiver.scope ?? '*'}`
+    const entry = waivedByCode.get(key) ?? { waiver: item.waiver, count: 0 }
+    entry.count++
+    waivedByCode.set(key, entry)
+  }
+  for (const { waiver, count } of waivedByCode.values()) {
+    lines.push(
+      `TRIAGE_WAIVED code=${waiver.code} count=${count} reviewBy=${waiver.reviewBy}${waiver.scope ? ' scope=' + waiver.scope : ''} reason="${waiver.reason.replace(/"/g, "'")}"`,
+    )
+  }
+  if (result.waiverIssues > 0) {
+    lines.push(
+      zh
+        ? `TRIAGE_NOTE waiverIssues=${result.waiverIssues}：备案条目缺理由或复审日期非法，它们不压制任何发现。`
+        : `TRIAGE_NOTE waiverIssues=${result.waiverIssues}: malformed waiver entries suppress nothing.`,
+    )
+  }
+
   todayList(result, locale).forEach((item, i) => lines.push(`TRIAGE_TODAY ${i + 1}) ${item}`))
   return lines
 }
 
+/**
+ * 今天只做这些：fix/decide 按 disposition → 影响面降序 → 成本升序取前 cap 条。
+ * 目的不是列全，而是给一个今天能做完的队列。
+ */
 export function todayList(result: TriageResult, locale: Locale = 'en', cap = 5): string[] {
   const zh = locale === 'zh'
   return result.groups
@@ -638,8 +933,88 @@ export function todayList(result: TriageResult, locale: Locale = 'en', cap = 5):
     .slice(0, cap)
     .map((g) => {
       const count = g.findings.length > 1 ? (zh ? `（${g.findings.length} 处）` : ` (${g.findings.length} sites)`) : ''
-      return `[${g.code}] ${fmt(g.policy.action, locale)}${count}`
+      return `[${g.code}] impact=${g.impact} effort=${g.effort} ${fmt(g.policy.action, locale)}${count}`
     })
+}
+
+/**
+ * 读外部 findings（P0-1）：别的扫描器 / 上一轮 qe-report.json / 人工导出的 JSON。
+ * 支持四种形状：Finding[]、{ findings }、{ guards }、{ readouts }。
+ * 字段不合法的条目直接抛错并指明第几条 —— 不静默丢弃（丢弃会把红读成绿）。
+ */
+export async function readExternalFindings(file: string): Promise<GuardReadout[]> {
+  const resolved = path.resolve(file)
+  let raw: string
+  try {
+    raw = await readFile(resolved, 'utf8')
+  } catch {
+    throw new Error(`找不到 findings 文件：${resolved}`)
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch (e) {
+    throw new Error(`${resolved} 不是合法 JSON：${(e as Error).message}`)
+  }
+  return normalizeReadouts(parsed, resolved)
+}
+
+const LEVELS = new Set(['error', 'warn', 'info'])
+
+function normalizeReadouts(parsed: unknown, label: string): GuardReadout[] {
+  if (Array.isArray(parsed)) {
+    const looksLikeReadouts = parsed.every((item) => item && typeof item === 'object' && 'guard' in item && 'findings' in item)
+    if (!looksLikeReadouts && parsed.some((item) => item && typeof item === 'object' && 'findings' in item)) {
+      throw new Error(`${label}: 不能把 readouts 与裸 findings 混在同一个数组里`)
+    }
+    return looksLikeReadouts
+      ? parsed.map((item, i) => toReadout(item, `${label}[${i}]`))
+      : [{ guard: `external:${path.basename(label)}`, findings: parsed.map((f, i) => toFinding(f, `${label}[${i}]`)), scanned: `external ${parsed.length}` }]
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`${label}: 顶层必须是数组或对象`)
+  }
+  const box = parsed as { findings?: unknown; guards?: unknown; readouts?: unknown }
+  const readouts = box.guards ?? box.readouts
+  if (Array.isArray(readouts)) return readouts.map((item, i) => toReadout(item, `${label}.${box.guards ? 'guards' : 'readouts'}[${i}]`))
+  if (Array.isArray(box.findings)) {
+    return [
+      {
+        guard: `external:${path.basename(label)}`,
+        findings: box.findings.map((f, i) => toFinding(f, `${label}.findings[${i}]`)),
+        scanned: `external ${box.findings.length}`,
+      },
+    ]
+  }
+  throw new Error(`${label}: 需要 Finding[]、{ findings }、{ guards } 或 { readouts }`)
+}
+
+function toReadout(value: unknown, label: string): GuardReadout {
+  const r = value as Partial<GuardReadout> | null
+  if (!r || typeof r !== 'object') throw new Error(`${label}: readout 必须是对象`)
+  if (typeof r.guard !== 'string' || !r.guard.trim()) throw new Error(`${label}: 缺少 guard 字段`)
+  if (!Array.isArray(r.findings)) throw new Error(`${label}: findings 必须是数组`)
+  return {
+    guard: r.guard,
+    findings: r.findings.map((f, i) => toFinding(f, `${label}.findings[${i}]`)),
+    scanned: typeof r.scanned === 'string' ? r.scanned : `external ${r.findings.length}`,
+    ...(typeof r.skipped === 'string' ? { skipped: r.skipped } : {}),
+  }
+}
+
+function toFinding(value: unknown, label: string): Finding {
+  const f = value as Partial<Finding> | null
+  if (!f || typeof f !== 'object') throw new Error(`${label}: finding 必须是对象`)
+  if (typeof f.code !== 'string' || !f.code.trim()) throw new Error(`${label}: 缺少 code`)
+  if (typeof f.level !== 'string' || !LEVELS.has(f.level)) throw new Error(`${label}: level 必须是 error / warn / info`)
+  return {
+    code: f.code,
+    level: f.level as Finding['level'],
+    message: typeof f.message === 'string' ? f.message : f.code,
+    ...(typeof f.file === 'string' ? { file: f.file } : {}),
+    ...(typeof f.line === 'number' ? { line: f.line } : {}),
+    ...(typeof f.entity === 'string' ? { entity: f.entity } : {}),
+  }
 }
 
 export async function writeTriage(
@@ -679,6 +1054,7 @@ export function renderTriageMarkdown(
         fix: '直接改',
         decide: '需要你选',
         record: '备案',
+        waived: '已被备案压制',
         skipped: '跳过守卫',
         regen: '复验命令',
         today: '今天只做这些',
@@ -687,14 +1063,18 @@ export function renderTriageMarkdown(
         s1: '1. 直接改（唯一正确动作）',
         s2: '2. 需要你选（每项已给推荐）',
         s3: '3. 备案即可（不修，只留账）',
+        s4: '4. 已备案（不压制后仍需在报告里可见）',
         none: '无。',
         what: '它是什么',
         recommend: '推荐动作',
         recordAction: '备案',
         options: '可选',
-        draft: '备案草稿（粘贴到 qe/ledger/incidents.json）',
+        impact: '影响面',
+        effort: '成本',
+        draft: '备案草稿（用 `autoqe waive <CODE> --reason ... --review-by ...` 写入 qe/waivers.json）',
         skippedGuards: '跳过的守卫',
-        scope: '口径：本清单只对本次实际扫到的 findings 负责；0 项 ≠ 无缺陷。处置政策单源在 `qe/lib/triage.ts`，未登记的代码一律进入「需要你选」，不会被自动备案。',
+        scope:
+          '口径：本清单只对本次实际扫到的 findings 负责；0 项 ≠ 无缺陷。处置政策单源在 `qe/lib/triage.ts`，未登记的代码一律进入「需要你选」，不会被自动备案。备案只在 qe/waivers.json 里且未过期时压制发现；过期条目不压制，并自己变成 WAIVER_EXPIRED 待办。',
       }
     : {
         title: 'Triage — what to do next',
@@ -703,6 +1083,7 @@ export function renderTriageMarkdown(
         fix: 'fix',
         decide: 'decide',
         record: 'record',
+        waived: 'suppressed by waivers',
         skipped: 'skipped guards',
         regen: 'Re-run',
         today: "Today's list",
@@ -711,15 +1092,18 @@ export function renderTriageMarkdown(
         s1: '1. Fix now (one correct action)',
         s2: '2. Decide (options with a recommendation)',
         s3: '3. Record only (no code change)',
+        s4: '4. Waived (still visible after suppression)',
         none: 'None.',
         what: 'What it is',
         recommend: 'Recommended',
         recordAction: 'Record',
         options: 'Options',
-        draft: 'Waiver draft (paste into qe/ledger/incidents.json)',
+        impact: 'Impact',
+        effort: 'Effort',
+        draft: 'Waiver draft (write it with `autoqe waive <CODE> --reason ... --review-by ...` into qe/waivers.json)',
         skippedGuards: 'Skipped guards',
         scope:
-          'Scope: this list covers only the findings from this run; 0 items is not proof of safety. The disposition table lives in `qe/lib/triage.ts`; unregistered codes always fall to decide and are never auto-waived.',
+          'Scope: this list covers only the findings from this run; 0 items is not proof of safety. The disposition table lives in `qe/lib/triage.ts`; unregistered codes always fall to decide and are never auto-waived. A waiver suppresses findings only while it is in qe/waivers.json and not past reviewBy; expired entries suppress nothing and surface as WAIVER_EXPIRED.',
       }
   const section = (title: string, disposition: Disposition): string => {
     const groups = result.groups.filter((g) => g.policy.disposition === disposition)
@@ -734,11 +1118,16 @@ export function renderTriageMarkdown(
           ? `\n- ${text.options}: ${g.policy.options.map((o) => fmt(o, locale)).join(zh ? '；' : '; ')}`
           : ''
         const lead = disposition === 'record' ? text.recordAction : text.recommend
-        return `### ${g.code} (${g.findings.length}, ${g.level})\n\n- ${text.what}: ${fmt(g.policy.meaning, locale)}\n- ${lead}: ${fmt(g.policy.action, locale)}${extra}\n${locs}`
+        return `### ${g.code} (${g.findings.length}, ${g.level}, ${text.impact}=${g.impact}, ${text.effort}=${g.effort})\n\n- ${text.what}: ${fmt(g.policy.meaning, locale)}\n- ${lead}: ${fmt(g.policy.action, locale)}${extra}\n${locs}`
       })
       .join('\n\n')
     return `## ${title}\n\n${body}\n`
   }
+  const waivedBody = result.waived.length
+    ? [...new Map(result.waived.map((w) => [`${w.waiver.code}@${w.waiver.reviewBy}`, w])).values()]
+        .map((w) => `- ${w.waiver.code}: ${w.waiver.reason} (reviewBy ${w.waiver.reviewBy}${w.waiver.scope ? `, scope ${w.waiver.scope}` : ''})`)
+        .join('\n')
+    : text.none
   const skipped = readouts
     .filter((r) => r.skipped)
     .map((r) => `- ${r.guard}: ${r.skipped}`)
@@ -747,7 +1136,7 @@ export function renderTriageMarkdown(
     .filter((g) => g.policy.disposition === 'record')
     .map((g) =>
       JSON.stringify(
-        { id: `C-${g.code}`, title: `${g.code}: ${g.findings.length}`, why: fmt(g.policy.meaning, locale), reviewBy: 'TODO-YYYY-MM-DD' },
+        { code: g.code, reason: `${fmt(g.policy.meaning, locale)} (${g.findings.length})`, reviewBy: 'TODO-YYYY-MM-DD' },
         null,
         2,
       ),
@@ -757,7 +1146,7 @@ export function renderTriageMarkdown(
   return `# ${text.title}
 
 - ${text.generated}: ${now}
-- ${text.conclusion}: ${total} = **${text.fix} ${result.fix}** / **${text.decide} ${result.decide}** / **${text.record} ${result.record}**
+- ${text.conclusion}: ${total} = **${text.fix} ${result.fix}** / **${text.decide} ${result.decide}** / **${text.record} ${result.record}** / **${text.waived} ${result.waived.length}**
 - ${text.skipped}: ${result.skipped}
 - ${text.regen}: \`${cli} run --root .\`
 
@@ -769,6 +1158,9 @@ ${applied.length ? `> ${text.applied}: ${applied.join(', ')}\n` : ''}
 ${section(text.s1, 'fix')}
 ${section(text.s2, 'decide')}
 ${section(text.s3, 'record')}
+## ${text.s4}
+
+${waivedBody}
 
 ## ${text.draft}
 

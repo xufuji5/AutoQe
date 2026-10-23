@@ -42,12 +42,24 @@ npx autoqe prompt audit --root . > prompt.txt
 - **decide** — 2–3 options with a recommendation; a human picks one;
 - **record** — traceability only, no runtime risk; produces a waiver draft with `reviewBy`.
 
-Unregistered finding codes always land in **decide**, never in **record**. The today list is capped at five,
-so the output is a finishable queue rather than a second backlog. `npm run test:triage` fails when a guard
-emits a code with no disposition, which keeps the judgment layer in sync with the guard layer.
+Unregistered finding codes always land in **decide**, never in **record**. The today list is capped at five and
+ordered by impact (`money` > `auth`/`pii` > `data` > `trace`) then effort (`S` < `M` < `L`), so the output is a
+finishable queue rather than a second backlog. `npm run test:triage` fails when a guard emits a code with no
+disposition, which keeps the judgment layer in sync with the guard layer.
 
-`init` writes `qe.config.json`, `QE-00`…`QE-09`, `qe/templates/`, `qe.contracts.json`, and `AGENTS.md`
-(or `AGENTS.autoqe.md` if the project already has one — merge it by hand, never overwrite host rules).
+Two more entry points matter when the agent cannot run the guards:
+
+```bash
+npx autoqe triage --root . --from-report qe-report/qe-report.json  # judge an existing report, no re-scan
+npx autoqe waive UNWIRED_SCRIPT --reason "kept for ops" --review-by 2026-12-31
+```
+
+A waiver is a dated liability: it suppresses a finding only while the entry has a reason and an unexpired
+`reviewBy`, the suppressed finding stays visible as `TRIAGE_WAIVED`, and an expired entry turns itself into a
+`WAIVER_EXPIRED` decide item. An agent may propose a waiver; it must not write one on its own.
+
+`init` writes `qe.config.json`, `QE-00`…`QE-09`, `qe/templates/`, `qe.contracts.json`, `qe/waivers.json`, and
+`AGENTS.md` (or `AGENTS.autoqe.md` if the project already has one — merge it by hand, never overwrite host rules).
 
 First run on an untouched project is often **yellow**: schema-dependent guards are `skipped`,
 `inv06`/`inv07` warn because the contract ledger is empty. That is honest, not a failure. Register

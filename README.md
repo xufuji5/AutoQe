@@ -134,7 +134,9 @@ RATCHET status=ok regressions=0 improvements=0 tracked=0
 | `npx autoqe status` | Stop-or-continue verdict: batch true-hole output, open gaps, skipped guards, ratchet |
 | `npx autoqe triage` | Sort findings into **fix / decide / record**; writes `qe-report/triage.md` with a capped today list and a waiver draft |
 | `npx autoqe triage --apply` | Apply only additive mechanical fixes (missing guard aliases in `package.json`), never source code |
-| `npx autoqe triage --lang zh` | Same report in Chinese; `locale` in `qe.config.json` sets the default |
+| `npx autoqe triage --from <json>` | Triage findings produced elsewhere (`Finding[]`, `{ findings }`, `{ guards }`) without re-running guards |
+| `npx autoqe triage --lang zh` | Human-facing output in Chinese for `triage`, `status` and `report`; `locale` in `qe.config.json` sets the default |
+| `npx autoqe waive CODE` | Add a waiver to `qe/waivers.json`; `--reason` and `--review-by YYYY-MM-DD` are required, `--scope` limits it to a path |
 | `npx autoqe scan` | Run all guards and write `qe-report/qe-report.md` in one shot |
 | `npx autoqe run --root .` | Run all guards against the target repository |
 | `npx autoqe explain INV-CORE-01` | Explain one invariant or guard (`inv22`, `qe:guard:inv22` also work); `--json` for machines |
