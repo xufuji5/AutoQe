@@ -4,6 +4,19 @@
   "type": "module",
   "description": "AutoQe — Quality Engineering toolkit for AI-assisted development: invariant registry, static guards, bad-sample self-tests and a ratchet baseline.",
   "license": "MIT",
+  "bin": {
+    "autoqe": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "qe/templates",
+    "qe/registry",
+    "QE-*.md",
+    "AGENTS.md",
+    "tsconfig.qe.json",
+    "docs/ai-agent-workflow.md",
+    "docs/configuration.md"
+  ],
   "keywords": [
     "quality-engineering",
     "static-analysis",
@@ -25,9 +38,13 @@
   },
   "homepage": "https://github.com/xufuji5/AutoQe#readme",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
+    "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.qe.json",
     "qe": "node qe/cli.ts run",
+    "qe:init": "node qe/cli.ts init",
     "qe:list": "node qe/cli.ts list",
+    "qe:status": "node qe/cli.ts status",
     "qe:selftest": "node qe/cli.ts selftest",
     "qe:report": "node qe/cli.ts report",
     "test:invariants": "node qe/cli.ts run",
@@ -45,8 +62,10 @@
     "qe:ratchet:update": "node qe/cli.ts ratchet-update",
     "qe:ci": "npm run typecheck && npm run qe:selftest && npm run test:invariants && npm run qe:report"
   },
-  "devDependencies": {
-    "@types/node": "^24.7.0",
+  "dependencies": {
     "typescript": "5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.0"
   }
 }

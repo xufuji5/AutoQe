@@ -330,6 +330,31 @@ On-call owner: <name / contact>
 - Every waiver has an expiry; an expired waiver automatically returns to P1.
 - For 24–72 hours after release, review via the G10 dashboards: error rate, latency, queue backlog, money/inventory discrepancies; any anomaly triggers the rollback conditions.
 
+### 10.1 When to stop mining (the graduation criterion)
+
+Mining has an economic endpoint. Do not decide it by feel; read it:
+
+```bash
+npx autoqe status --root .
+# DECISION STOP-MINING reason="last two batches produced 1 / 0 true holes (<1 for two batches)"
+```
+
+| Verdict | Trigger | What to do |
+|---|---|---|
+| `REPAIR` | any guard error or ratchet regression | fix first; adding audit batches now hides the red |
+| `ADJUDICATE` | an `open` invariant passed its `revisitBy` | upgrade / renew with a reason / move to runtime compensation |
+| `STOP-MINING` | last two batch ledgers each produced **< 1 true hole** | switch from mining to runtime netting |
+| `INSUFFICIENT-HISTORY` | fewer than two judged ledgers | an empty or single-batch history never proves "keep going" |
+| `CONTINUE-MINING` | output still ≥ 1 true hole per batch | run the next batch and record it |
+
+**True hole** = a ledger row whose severity is exactly `P0`/`P1` and whose evidence is `E1`–`E3`.
+`E0` rows are leads and are reported separately; they never inflate the curve.
+
+On `STOP-MINING`, move the remaining risk to reconstruction and monitoring: reconciliation invariants
+(ledger / counter / balance), alerting-channel self-check, canary rollout, and a weekly reconciliation probe.
+Record the accepted residual risk in the release decision (section 8) so the next person knows what was
+deliberately not mined.
+
 ---
 
 **中文摘要**：通用体检作业单：S0 事实基线 → S1 快扫 → S2 深挖 → S3 定级 → S4 十二道上线闸。

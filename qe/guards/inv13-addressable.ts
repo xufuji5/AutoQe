@@ -2,6 +2,7 @@ import path from 'node:path'
 import { defineGuard, err, info, warn } from '../lib/guard.ts'
 import { DEFECT_CLASSES } from '../registry/types.ts'
 import { readTextSafe, rel, walkFiles } from '../lib/fs.ts'
+import { NotApplicable } from '../lib/not-applicable.ts'
 
 const FIXTURES = path.join(import.meta.dirname, '../fixtures/inv13-addressable')
 
@@ -17,6 +18,9 @@ export const inv13 = defineGuard({
     'registry 是 TS 模块，本守卫读到的是运行时加载结果，不校验源文件格式',
   ],
   async run(ctx) {
+    if (ctx.config.metaGuards === false) {
+      throw new NotApplicable('metaGuards=false：宿主未内置守卫（CLI 模式），inv13 由 AutoQe 自身 CI 负责')
+    }
     const pkgText = await readTextSafe(path.join(ctx.root, ctx.config.packageJson))
     if (pkgText === null) {
       return {

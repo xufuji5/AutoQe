@@ -28,10 +28,17 @@ export interface QeConfig {
   guardsDir: string
   packageJson: string
   ledger: string
+  /** 审计批次工作区（QE-03 产物），status 用它计算真洞产出曲线 */
+  auditDir: string
   /** Next.js 服务端边界判据（可覆盖默认词表） */
   boundaries?: Partial<BoundaryConfig>
   /** 前端模块边界与敏感字段词表 */
   stores?: Partial<StoreConfig>
+  /**
+   * 是否校验本仓内置的守卫装配（inv13：别名、坏样本、孤儿守卫）。
+   * CLI 模式下守卫在 npm 包里，本仓没有 qe/guards，应设为 false。
+   */
+  metaGuards?: boolean
 }
 
 export const defaultSourceExtensions = ['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']
@@ -52,6 +59,8 @@ export const defaultConfig: QeConfig = {
   guardsDir: 'qe/guards',
   packageJson: 'package.json',
   ledger: 'qe/ledger/incidents.json',
+  auditDir: 'qe-audit',
+  metaGuards: true,
 }
 
 /** 深度合并嵌套配置块（schema/source/systemFields），数组整体替换 */
@@ -74,11 +83,19 @@ export async function loadConfig(root: string): Promise<QeConfig> {
   try {
     raw = await readFile(file, 'utf8')
   } catch {
-    return { ...defaultConfig }
+    return withSelfIgnore(root, { ...defaultConfig })
   }
   try {
-    return mergeConfig(defaultConfig, JSON.parse(raw) as Partial<QeConfig>)
+    return withSelfIgnore(root, mergeConfig(defaultConfig, JSON.parse(raw) as Partial<QeConfig>))
   } catch (e) {
     throw new Error(`qe.config.json 解析失败：${(e as Error).message}`)
   }
+}
+
+/** copy-in 模式：包目录若在目标仓内，自动排除它，避免扫描到工具本身 */
+function withSelfIgnore(root: string, config: QeConfig): QeConfig {
+  const packageRoot = path.resolve(import.meta.dirname, '..', '..')
+  const rel = path.relative(root, packageRoot).split(path.sep).join('/')
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || config.ignore.includes(rel)) return config
+  return { ...config, ignore: [...config.ignore, rel] }
 }

@@ -71,6 +71,16 @@ AI 写代码的速度，已经超过了人审代码的速度。
 
 ## 五、五分钟跑起来
 
+用在已有项目里（不复制任何源码）：
+
+```bash
+cd 你的项目
+npx autoqe init         # 生成配置、文档、模板；自动识别 prisma/schema.prisma 与 src/app
+npx autoqe run --root . # 跑全部守卫，输出 QE_RESULT 读数
+```
+
+想先在本仓体验完整门禁：
+
 ```bash
 git clone https://github.com/xufuji5/AutoQe.git
 cd AutoQe
@@ -78,6 +88,11 @@ npm install
 npm run qe:selftest   # 19 个坏样本自证
 npm run qe:ci         # 类型检查 + 自证 + 守卫 + 报告
 ```
+
+如果你用 Codex、Claude Code、WorkBuddy 这类工具：**先跑 CLI 拿读数，再让模型做语义审计**。
+把 `AGENTS.md`、`QE-00-index.md`、`QE-03` 和 `npx autoqe run --root .` 的原始输出一起交给它，
+按 S0–S4 产出体检文件；模型不得自证绿灯，skipped 永远算黄。完整提示词与各工具配置见
+仓库里的 `docs/ai-agent-workflow.md`。
 
 真实输出（本仓当前读数）：
 
