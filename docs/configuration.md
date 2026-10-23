@@ -139,6 +139,7 @@ name, so an obfuscated key escapes the check — name persisted keys literally.
 | `packageJson` | `package.json` | Manifest checked for guard aliases (`inv13`) |
 | `ledger` | `qe/ledger/incidents.json` | Incident ledger read by the report |
 | `auditDir` | `qe-audit` | Batch workspace read by `autoqe status` (expects `<batch>/03-bug-ledger.md`) |
+| `locale` | `en` | Language of the human-facing `triage` report (`en` / `zh`); machine readings stay English |
 | `metaGuards` | `true` | Whether to audit this repo's own guard wiring (`inv13`) |
 
 **`metaGuards` is `false` in CLI mode.** When guards live in `node_modules/autoqe`, the host has no

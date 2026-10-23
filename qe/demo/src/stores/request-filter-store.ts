@@ -1,11 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export const useOrderFilterStore = create(
+export const useRequestFilterStore = create(
   persist(
     () => ({ keyword: '' }),
     {
-      name: 'order-filters',
+      name: 'request-filters',
       version: 1,
       partialize: (state) => ({ keyword: state.keyword }),
     },

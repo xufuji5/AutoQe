@@ -64,7 +64,7 @@
 | Error rate / 错误率 | | | |
 | P95 latency / P95 时延 | | | |
 | Queue backlog / 队列积压 | | | |
-| Money / inventory variance / 资金与库存差异 | | | |
+| Money / asset balance variance / 资金与资产余额差异 | | | |
 | Key business volume / 关键业务量 | | | |
 
 ## 8. Sign-off / 签署

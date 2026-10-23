@@ -146,7 +146,7 @@ Execute each track as "check → criterion → evidence → default level". Tick
 | ID | Check | Criterion | Evidence | Level |
 |---|---|---|---|---|
 | E1 | Request body limits | Enforced at gateway or framework layer | Oversized request test | P1 |
-| E2 | Rate limiting | Login/checkout/search/export | Load test or config | P1 |
+| E2 | Rate limiting | Login/submit/search/export | Load test or config | P1 |
 | E3 | Pagination caps | `take/limit` has a hard ceiling | Oversized page request | P1 |
 | E4 | No output leakage | No stack traces, SQL, internal paths, or full-row dumps | Error response samples | P0 |
 | E5 | Log redaction | No plaintext tokens, phone numbers, ID numbers, card numbers | Log samples | P0 |
@@ -354,6 +354,34 @@ On `STOP-MINING`, move the remaining risk to reconstruction and monitoring: reco
 (ledger / counter / balance), alerting-channel self-check, canary rollout, and a weekly reconciliation probe.
 Record the accepted residual risk in the release decision (section 8) so the next person knows what was
 deliberately not mined.
+
+### 10.2 The triage layer: fix / decide / record
+
+A findings list is not a work plan. Every non-info finding must land in exactly one bucket, so the next
+actor (human or AI) never has to invent a priority:
+
+| Bucket | Meaning | Who acts | Output |
+|---|---|---|---|
+| **fix** | one mechanically correct action exists | the tool, or anyone | exact action; `--apply` only for additive, reversible edits (guard aliases) |
+| **decide** | 2–3 defensible options with different trade-offs | a human | recommended option + alternatives |
+| **record** | does not affect runtime; only traceability is missing | nobody | waiver draft: reason + `reviewBy` |
+
+```bash
+npx autoqe triage --root .
+# TRIAGE actionable=3 fix=1 decide=2 record=0 skipped=0
+# TRIAGE_TODAY 1) [ALIAS_MISSING] ...
+```
+
+Rules that make the layer trustworthy:
+
+1. **Unknown codes are `decide`, never `record`.** An unregistered finding cannot be silently waived.
+2. **`fix` means one answer.** If two reasonable actions exist, it is `decide` — even if one looks obvious.
+3. **`record` never hides a runtime risk.** It is for traceability gaps (unwired scripts, orphan guards), not for defects.
+4. **The today list is capped (5).** The point is a short, finishable queue, not a second backlog.
+5. **Zero findings ≠ safe.** `skipped` and scanned-object counts are printed next to the result; an empty set never prints a pass.
+
+The policy table is a single source in `qe/lib/triage.ts`; `npm run test:triage` fails when a guard emits
+a code without a disposition, so the judgment layer cannot silently fall behind the guard layer.
 
 ---
 

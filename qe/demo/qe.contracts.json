@@ -2,23 +2,23 @@
   "promises": [
     {
       "id": "PR-01",
-      "claim": "未通过质检报告闸门的商品不可上架",
+      "claim": "未通过审核报告闸门的记录不可发布",
       "source": {
         "file": "qe/demo/docs/rules.md",
-        "contains": "未通过质检报告闸门的商品不可上架"
+        "contains": "未通过审核报告闸门的记录不可发布"
       },
       "backing": {
         "roots": ["qe/demo/src"],
-        "pattern": "QC_REPORT_REQUIRED"
+        "pattern": "APPROVAL_REPORT_REQUIRED"
       }
     }
   ],
   "gates": [
     {
-      "id": "GATE-QC-01",
-      "reject": "缺少质检报告不可上架",
-      "server": { "roots": ["qe/demo/src"], "pattern": "QC_REPORT_REQUIRED" },
-      "control": { "roots": ["qe/demo/src"], "pattern": "qcReportUrl" }
+      "id": "GATE-APPROVAL",
+      "reject": "缺少审核报告不可发布",
+      "server": { "roots": ["qe/demo/src"], "pattern": "APPROVAL_REPORT_REQUIRED" },
+      "control": { "roots": ["qe/demo/src"], "pattern": "approvalReportUrl" }
     }
   ]
 }

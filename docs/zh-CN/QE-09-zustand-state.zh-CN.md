@@ -10,7 +10,7 @@
 
 1. **落盘泄漏**：`persist` 把 token/密码写进 localStorage，XSS 后一条脚本读走，日志无异常。
 2. **结构漂移**：字段改名后旧 localStorage 数据仍在，hydration 后字段是 `undefined`，界面显示空白但不报错。
-3. **职责错位**：把服务端数据（订单列表、用户资料）复制进 Zustand，缓存与 DB 各自演化，出现「刷新才对」。
+3. **职责错位**：把服务端数据（业务列表、用户资料）复制进 Zustand，缓存与 DB 各自演化，出现「刷新才对」。
 
 判据分别对应：`partialize` 白名单（INV-FE-01）、`partialize` 存在 + `version`（INV-FE-02）、store 只存视图状态（评审）。
 
@@ -31,24 +31,24 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-interface OrderFilterState {
+interface RequestFilterState {
   keyword: string
   setKeyword: (v: string) => void
 }
 
-export const useOrderFilterStore = create<OrderFilterState>()(
+export const useRequestFilterStore = create<RequestFilterState>()(
   persist(
     (set) => ({
       keyword: '',
       setKeyword: (keyword) => set({ keyword }),
     }),
     {
-      name: 'order-filters',
+      name: 'request-filters',
       version: 1,                                   // INV-FE-02
       partialize: (s) => ({ keyword: s.keyword }), // INV-FE-01：白名单
       migrate: (persisted, oldVersion) => {         // 旧结构兜底
         if (oldVersion < 1) return { keyword: '' }
-        return persisted as OrderFilterState
+        return persisted as RequestFilterState
       },
     },
   ),

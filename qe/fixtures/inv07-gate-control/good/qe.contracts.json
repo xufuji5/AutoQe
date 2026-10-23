@@ -2,16 +2,16 @@
   "promises": [],
   "gates": [
     {
-      "id": "GATE-QC",
-      "reject": "缺少质检报告不可上架",
-      "server": { "roots": ["src"], "pattern": "QC_REPORT_REQUIRED" },
-      "control": { "roots": ["src"], "pattern": "qcReportUrl" }
+      "id": "GATE-APPROVAL",
+      "reject": "缺少审核报告不可发布",
+      "server": { "roots": ["src"], "pattern": "APPROVAL_REPORT_REQUIRED" },
+      "control": { "roots": ["src"], "pattern": "approvalReportUrl" }
     },
     {
-      "id": "GATE-STOCK",
-      "reject": "库存不足不可下单",
-      "server": { "roots": ["src"], "pattern": "STOCK_INSUFFICIENT" },
-      "control": { "roots": ["src"], "pattern": "stockQty" }
+      "id": "GATE-QUOTA",
+      "reject": "配额不足不可提交",
+      "server": { "roots": ["src"], "pattern": "QUOTA_INSUFFICIENT" },
+      "control": { "roots": ["src"], "pattern": "quotaQty" }
     }
   ]
 }

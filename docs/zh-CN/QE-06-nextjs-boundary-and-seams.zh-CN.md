@@ -23,7 +23,7 @@ AI 按模块并行生成代码时，每个模块内部往往自洽，但跨模�
 |---|---|---|
 | 1 | 新加一个 `POST` route，忘了鉴权，测试用登录态跑全绿 | `ENTRY_NO_AUTH`（inv20） |
 | 2 | 前端做了 zod 校验，服务端只 `request.json()`，绕过 UI 直接打接口 | `ENTRY_NO_VALIDATE`（inv20） |
-| 3 | 双提交/重放导致重复下单、重复扣减，日志看起来一切正常 | `MUTATION_NO_IDEMPOTENCY`（inv20，告警） |
+| 3 | 双提交/重放导致重复提交、重复扣减，日志看起来一切正常 | `MUTATION_NO_IDEMPOTENCY`（inv20，告警） |
 | 4 | 为了「健康检查」加了公共路由，后来变成数据出口 | `PUBLIC_NO_REASON` / `PUBLIC_ROUTE_STALE`（inv20） |
 | 5 | `'use client'` 文件 import 了 `@prisma/client` 或 `db.ts` | `CLIENT_IMPORTS_SERVER` / `CLIENT_TOUCHES_SERVER`（inv21） |
 | 6 | 模块 A 用 `../b/service.ts` 深导模块 B 内部，B 重构后 A 静默拿到旧逻辑 | `CROSS_MODULE_RELATIVE`（inv21，告警） |

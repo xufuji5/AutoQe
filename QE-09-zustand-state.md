@@ -8,7 +8,7 @@
 
 1. **Persistence leak**: `persist` writes the token/password into localStorage; one script after an XSS reads it, and the logs show nothing.
 2. **Structural drift**: after a field rename, the old localStorage data remains; after hydration the field is `undefined` and the UI renders blank without throwing.
-3. **Misplaced responsibility**: server data (order lists, user profiles) is copied into Zustand; cache and database evolve independently, producing "correct only after a refresh".
+3. **Misplaced responsibility**: server data (business lists, user profiles) is copied into Zustand; cache and database evolve independently, producing "correct only after a refresh".
 
 The criteria map respectively to: a `partialize` allowlist (INV-FE-01), `partialize` present + `version` (INV-FE-02), and a store that holds view state only (review).
 
@@ -29,24 +29,24 @@ The criteria map respectively to: a `partialize` allowlist (INV-FE-01), `partial
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-interface OrderFilterState {
+interface RequestFilterState {
   keyword: string
   setKeyword: (v: string) => void
 }
 
-export const useOrderFilterStore = create<OrderFilterState>()(
+export const useRequestFilterStore = create<RequestFilterState>()(
   persist(
     (set) => ({
       keyword: '',
       setKeyword: (keyword) => set({ keyword }),
     }),
     {
-      name: 'order-filters',
+      name: 'request-filters',
       version: 1,                                   // INV-FE-02
       partialize: (s) => ({ keyword: s.keyword }), // INV-FE-01: allowlist
       migrate: (persisted, oldVersion) => {         // fallback for the old shape
         if (oldVersion < 1) return { keyword: '' }
-        return persisted as OrderFilterState
+        return persisted as RequestFilterState
       },
     },
   ),

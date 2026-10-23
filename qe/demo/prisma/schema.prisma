@@ -1,19 +1,19 @@
-enum OrderStatus {
-  PENDING
-  PAID
-  SHIPPED
-  COMPLETED
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  CLOSED
 }
 
-model Order {
-  id         String      @id @default(cuid())
+model Request {
+  id         String        @id @default(cuid())
   tenantId   String
-  status     OrderStatus @default(PENDING)
-  totalCents Int
-  buyerNote  String?
-  archivedAt DateTime? /// @archive 仅审计导出读取
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  status     RequestStatus @default(DRAFT)
+  amountCents Int
+  note       String?
+  archivedAt DateTime?     /// @archive 仅审计导出读取
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
-  @@map("orders")
+  @@map("requests")
 }

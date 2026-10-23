@@ -30,6 +30,8 @@ export interface QeConfig {
   ledger: string
   /** 审计批次工作区（QE-03 产物），status 用它计算真洞产出曲线 */
   auditDir: string
+  /** 面向人读的输出语言（triage 报告与提示词）；机器读数行始终英文 */
+  locale?: 'en' | 'zh'
   /** Next.js 服务端边界判据（可覆盖默认词表） */
   boundaries?: Partial<BoundaryConfig>
   /** 前端模块边界与敏感字段词表 */
@@ -60,6 +62,7 @@ export const defaultConfig: QeConfig = {
   packageJson: 'package.json',
   ledger: 'qe/ledger/incidents.json',
   auditDir: 'qe-audit',
+  locale: 'en',
   metaGuards: true,
 }
 

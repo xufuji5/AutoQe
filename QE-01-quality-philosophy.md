@@ -1,8 +1,8 @@
 # QE-01 · AI Coding Quality Handbook (General Edition v1.0)
 
-> Audience: small and mid-sized teams (1–5 people plus AI) where AI is the main coding force; typical systems are e-commerce, production management (MES/QMS/GMP), and SaaS business systems.
+> Audience: small and mid-sized teams (1–5 people plus AI) where AI is the main coding force; typical systems are business systems with money, state, and audit flows.
 > How to use: chapters 5–9 form a sequential handbook (follow them in order); chapter 8 (the invariant library) and appendix B (the case set) are lookup material; every new project starts with the audit in chapter 10.
-> Every criterion in this handbook comes from paid lessons in real repositories (an e-commerce system and a GMP production-management system, measured in 2026-10), not from theoretical reasoning.
+> Every criterion in this handbook comes from paid lessons in real production repositories (measured in 2026), not from theoretical reasoning.
 
 ---
 
@@ -101,17 +101,17 @@ Every sentence in a spec, a comment, or UI copy that says "the system will do X"
 1. **One table, one owner module.** Cross-module access goes only through the service layer; direct cross-module access to business tables is forbidden. The owner is responsible for all fields, constraints, and guards of that table.
 2. **Dependencies flow one way**: presentation → domain → data. Reverse references are forbidden (the presentation layer must not define domain rules; the domain layer must not import presentation components).
 3. **An invariant lives at its cheapest layer**: tenant isolation in the database (RLS), state machines in types + guards, business criteria in the registry, copy in a single-source vocabulary. **If it can sink, it must never float** — floating one layer up multiplies detection cost by 5.
-4. **Every cross-module contract registers an owner**: error-code domain, enum domain, state-machine domain, contract domain each have exactly one source of truth. AI does not know that two rules come from the same owner; only a registry entry stops it from writing both (appendix B-10: spec ↔ code copy drifted in 31 places).
+4. **Every cross-module contract registers an owner**: error-code domain, enum domain, state-machine domain, contract domain each have exactly one source of truth. AI does not know that two rules come from the same owner; only a registry entry stops it from writing both (appendix B-10: spec ↔ code copy drifted in dozens of places).
 
 ### 3.2 Scenario hole map (same skeleton, different fillings)
 
-| Hole position | E-commerce | Production management (GMP/MES) |
+| Hole position | Transaction-heavy systems | Audit-heavy workflow systems |
 |---|---|---|
-| Concurrency and money | Overselling, duplicate payment callbacks, multiple promo price versions | Batch-number sequencing colliding with P2002, race on audit-chain sequence numbers |
-| Audit and traceability | Operation logs, order trail | Field-level audit + hash chain, signature bound to a snapshot |
-| State machine | Order / refund / fulfillment | Four-level review chain, release blocklist |
-| Irreversible | Order deletion / refund approval | Migration chain, destruction, adding enum values |
-| Compliance wording | Advertising claims / price labels | Regulatory criteria, scenario-specific limits |
+| Concurrency and value | Overselling, duplicate callbacks, multiple price versions | Sequence collisions, race on audit-sequence numbers |
+| Audit and traceability | Operation logs, entity change trail | Field-level audit + hash chain, signature bound to a snapshot |
+| State machine | Request / approval / fulfillment | Multi-step review chain, release hold |
+| Irreversible | Deletion / irreversible approval | Migration chain, destruction, adding enum values |
+| Compliance wording | Claims / price labels | Criteria wording, scenario-specific limits |
 
 **Architecture review asks one question: in this design, at which seam does "both sides miss it together"?** If you cannot answer, the design is not finished.
 
@@ -218,7 +218,7 @@ schema.prisma ──generate──▶ TS types ──generate──▶ zod valid
 ### 6.4 False red and false green are equally guilty
 
 - **False green** lets a defect through and makes people believe it was verified (reading 0 objects and reporting green; a scope lagging behind reality and silently passing).
-- **False red** burns trust and makes people "fix" things that are not broken — **when a guard reports 33 problems, the first reaction should be "the guard is wrong", not "the code has 33 problems"** (the case where certificate-issuing logic was nearly deleted as dead code).
+- **False red** burns trust and makes people "fix" things that are not broken — **when a guard reports 33 problems, the first reaction should be "the guard is wrong", not "the code has 33 problems"** (the case where a disused feature was nearly deleted as dead code).
 - Companion rule: **fixtures with a time window must not hard-code absolute dates** (an assertion that was genuinely green will turn red as the calendar moves, which is harder to spot than an always-true assertion).
 
 ### 6.5 Test gate checklist
@@ -263,21 +263,21 @@ schema.prisma ──generate──▶ TS types ──generate──▶ zod valid
 | 14 | HEAD builds from a clean checkout; all critical files are committed | Clean-worktree compile probe |
 | 15 | Mechanism present ≠ in effect: a delivery claim requires an enablement rate > 0 for declarations/templates/guards | Enablement-rate reading (INFO, always present) |
 
-### 8.2 Scenario pack A: e-commerce (append to the skeleton)
+### 8.2 Scenario pack A: transaction-heavy systems (append to the skeleton)
 
-- Stock deduction must be CAS (`WHERE stock >= ?`); read-then-write is forbidden
-- Idempotency keys across the whole payment/callback chain; a repeated notification never creates a second record
-- Refund amounts follow the server-side ledger; client amounts are display-only
-- Promo prices are computed from one source; no second discount applied in the frontend
-- Coupon redemption is concurrency-atomic; expiry is judged by the server clock
-- Hot sequences (order numbers / coupon numbers) use advisory locks or a sequence table; `max+1` is forbidden
+- Balance deduction must be CAS (`WHERE balance >= ?`); read-then-write is forbidden
+- Idempotency keys across the whole external-callback chain; a repeated notification never creates a second record
+- Monetary amounts follow the server-side ledger; client amounts are display-only
+- Values are computed from one source; no second adjustment applied in the frontend
+- One-time token redemption is concurrency-atomic; expiry is judged by the server clock
+- Hot sequences (business numbers / token numbers) use advisory locks or a sequence table; `max+1` is forbidden
 
-### 8.3 Scenario pack B: production management / GMP (append to the skeleton)
+### 8.3 Scenario pack B: audit-heavy approval systems (append to the skeleton)
 
 - Field-level audit is append-only: DB triggers + application guards + permission revocation, three layers
 - Signatures bind to a snapshot taken at signing time; verification recomputes from the snapshot, never reads the live row
 - Four-eyes review is hard-rejected server-side: self-review by the same person, double-signing by the same person, and out-of-order steps all return 4xx
-- While the release blocklist is not cleared, the approval action is unreachable server-side (not merely a greyed-out button)
+- While the release hold is not cleared, the approval action is unreachable server-side (not merely a greyed-out button)
 - Every enum production path is registered; dead enums are adjudicated on the spot
 - Irreversible operations (migration / destruction / adding enum values) go through the five approval questions + a clean-database replay
 - Offline late signing is visible: an `offline` flag plus the delay duration always shown; offline is forbidden at L3
@@ -368,23 +368,25 @@ Proposal (originating document) → ledger entry → affected surfaces synchroni
 
 ## Appendix B: Case set (15 real cases; each one is the birth certificate of a criterion)
 
-| # | Case | Criterion it produced |
+> The cases below are deliberately worded in a neutral business domain on purpose: they describe the *class* of failure, not a client's system. Read each as a defect class, not as a spec of any one product.
+
+| # | Case (generalized) | Criterion it produced |
 |---|---|---|
-| 1 | A supplier-qualification gate queried the audit trail by a key that had no data-entry channel at all — the gate always took the empty branch | Reverse census of idling gates: rejection sentence ⇄ UI control |
-| 2 | A three-signature chain was split into four per-signer columns with zero writers across the whole database; the certificate dossier printed a rank string instead of a person's name | Live table, dead column: a column has a writer or it does not exist |
-| 3 | The soft-delete column existed, four read paths filtered and five did not — the detail page of a voided row returned it verbatim | Soft-delete read full set (including read-by-id, count, export) |
+| 1 | A qualification gate queried the audit trail by a key that had no data-entry channel at all — the gate always took the empty branch | Reverse census of idling gates: rejection sentence ⇄ UI control |
+| 2 | A multi-step approval chain was split into per-approver columns with zero writers across the whole database; a dossier printed a rank string instead of a person's name | Live table, dead column: a column has a writer or it does not exist |
+| 3 | The soft-delete column existed, four read paths filtered and five did not — a detail page returned a voided row verbatim | Soft-delete read full set (including read-by-id, count, export) |
 | 4 | An RLS probe had a misspelled GUC name; every tenant silently received 0 rows with no error | False-zero criterion: a wrong context returning 0 without an error is more dangerous than an error |
 | 5 | The error-code guard script was on disk but had no npm entry; the batch always ran green while two copy sites were actually drifting red | Guards on the books must actually run (registry V4) |
-| 6 | The first version of the state guard reported 33 "problems"; verification found 12 real gaps — certificate-issuing logic was nearly deleted as dead code | False red and false green are equally guilty: too many reds → suspect the criterion first |
-| 7 | A 12-item self-check on issuing certificates ("any red → block") was written in the ledger, with zero calls and zero throws on the issuance path | Phantom rule: every promise must be backed by a throw site |
-| 8 | The mandatory device-binding mechanism was built; in the production database `require_equipment` was 2/1398, binding rate ≈ 0 | Mechanism present ≠ in effect: enablement-rate reading goes into the ledger |
-| 9 | Three libs were in the working tree but not in HEAD; a clean checkout must fail with TS2307 | HEAD-buildable probe |
-| 10 | Error-code copy was written twice, in a 30-volume spec set and in the catalog; reconciling 127 codes showed 31 drifts | Contract single source: no second copy of the body |
-| 11 | An inspection guard was "once established, later lost": the ledger kept the first-run number while script / npm / references were all zero | In-place reconciliation (same family as case 5) |
-| 12 | The idempotency implementation caught P2002 and kept writing inside the same transaction; the whole transaction rolled back — in the "already exists" round it could not even stop writing | "Idempotent success" and "write failure" cannot share one false |
+| 6 | The first version of the state guard reported 33 "problems"; verification found 12 real gaps — a disused feature was nearly deleted as dead code | False red and false green are equally guilty: too many reds → suspect the criterion first |
+| 7 | A 12-item self-check ("any red → block") was written in the ledger, with zero calls and zero throws on the guarded path | Phantom rule: every promise must be backed by a throw site |
+| 8 | A mandatory control mechanism was built; in the production database its enablement rate was ~0 | Mechanism present ≠ in effect: enablement-rate reading goes into the ledger |
+| 9 | Three helper libs were in the working tree but not in HEAD; a clean checkout must fail with a missing-module error | HEAD-buildable probe |
+| 10 | An error-code vocabulary was written twice, in a large spec set and in a catalog; reconciling the codes showed dozens of drifts | Contract single source: no second copy of the body |
+| 11 | A guard was "once established, later lost": the ledger kept the first-run number while script / entry / references were all zero | In-place reconciliation (same family as case 5) |
+| 12 | The idempotency implementation caught a uniqueness error and kept writing inside the same transaction; the whole transaction rolled back — in the "already exists" round it could not even stop writing | "Idempotent success" and "write failure" cannot share one false |
 | 13 | Dead columns are often accompanied by read points: a column read by someone and written by no one — treating reads as writes keeps the criterion green forever | "Reads do not count as writes" discrimination (the load-bearing point of INV-01) |
-| 14 | An enum type was never created in the database: table present, column present, any write fails with 42704 — "table exists ≠ table usable" | Migration ↔ schema object-level reconciliation |
-| 15 | A leave-request fixture hard-coded absolute dates; ten days later the assertion demanded an error for a state that no longer existed | Time-window fixtures must not hard-code absolute dates |
+| 14 | An enum type was never created in the database: table present, column present, any write fails at runtime — "table exists ≠ table usable" | Migration ↔ schema object-level reconciliation |
+| 15 | A fixture hard-coded absolute dates; ten days later the assertion demanded an error for a state that no longer existed | Time-window fixtures must not hard-code absolute dates |
 
 ## Appendix C: Templates
 
@@ -414,7 +416,7 @@ Proposal (originating document) → ledger entry → affected surfaces synchroni
 
 ---
 
-*Handbook v1.0 · 2026-10-22 · every criterion comes from measured readings in two real repositories; start the next revision by appending a case to appendix B.*
+*Handbook v1.0 · 2026-10-22 · every criterion comes from measured readings in real production repositories; start the next revision by appending a case to appendix B.*
 
 ---
 

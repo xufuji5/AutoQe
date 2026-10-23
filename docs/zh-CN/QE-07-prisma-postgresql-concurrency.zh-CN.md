@@ -37,20 +37,20 @@ T2: write balance = 90   -- 也扣 10，实际只扣了一次
 ### 3.1 唯一性
 
 ```prisma
-model Order {
+model Request {
   id          String   @id @default(cuid())
   tenantId    String
-  orderNo     String
-  status      OrderStatus @default(PENDING)
-  totalCents  Int
+  requestNo   String
+  status      RequestStatus @default(DRAFT)
+  amountCents Int
   version     Int      @default(0)
   deletedAt   DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@unique([tenantId, orderNo])   // 业务唯一键必须落到 DB
+  @@unique([tenantId, requestNo])   // 业务唯一键必须落到 DB
   @@index([tenantId, status, createdAt])
-  @@map("orders")
+  @@map("requests")
 }
 ```
 
@@ -59,11 +59,11 @@ model Order {
 ### 3.2 条件更新（状态机）
 
 ```ts
-const updated = await prisma.order.updateMany({
-  where: { id, status: 'PENDING' },
-  data: { status: 'PAID', paidAt: new Date() },
+const updated = await prisma.request.updateMany({
+  where: { id, status: 'DRAFT' },
+  data: { status: 'APPROVED', approvedAt: new Date() },
 })
-if (updated.count === 0) throw new ConflictError('ORDER_STATE_CONFLICT')
+if (updated.count === 0) throw new ConflictError('REQUEST_STATE_CONFLICT')
 ```
 
 判据：状态迁移必须带「前置状态」谓词，并检查 `count`。裸 `update({ where: { id } })` 视为丢失更新风险。
@@ -72,16 +72,16 @@ if (updated.count === 0) throw new ConflictError('ORDER_STATE_CONFLICT')
 
 ```ts
 await prisma.$transaction(async (tx) => {
-  const rows = await tx.order.updateMany({
-    where: { id, status: 'PENDING', version },
-    data: { status: 'PAID', version: { increment: 1 } },
+  const rows = await tx.request.updateMany({
+    where: { id, status: 'DRAFT', version },
+    data: { status: 'APPROVED', version: { increment: 1 } },
   })
-  if (rows.count === 0) throw new ConflictError('ORDER_VERSION_CONFLICT')
-  await tx.ledger.create({ data: { orderId: id, amountCents, direction: 'IN' } })
+  if (rows.count === 0) throw new ConflictError('REQUEST_VERSION_CONFLICT')
+  await tx.ledger.create({ data: { requestId: id, amountCents, direction: 'IN' } })
 })
 ```
 
-- 资金/库存的「读—判—写」必须同事务。
+- 资金/资产的「读—判—写」必须同事务。
 - 热点行用乐观锁（`version`）或 `SELECT … FOR UPDATE`（Prisma 需 `$queryRaw`）。
 - 死锁/序列化失败要**分类重试**（有限次数 + 退避），不能吞掉当成功。
 

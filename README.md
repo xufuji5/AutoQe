@@ -132,6 +132,9 @@ RATCHET status=ok regressions=0 improvements=0 tracked=0
 | `npx autoqe init` | Scaffold config, docs and templates into a target repository |
 | `npx autoqe doctor` | Pre-flight check: Node, config, schema, source roots, contracts, ratchet; prints the next step |
 | `npx autoqe status` | Stop-or-continue verdict: batch true-hole output, open gaps, skipped guards, ratchet |
+| `npx autoqe triage` | Sort findings into **fix / decide / record**; writes `qe-report/triage.md` with a capped today list and a waiver draft |
+| `npx autoqe triage --apply` | Apply only additive mechanical fixes (missing guard aliases in `package.json`), never source code |
+| `npx autoqe triage --lang zh` | Same report in Chinese; `locale` in `qe.config.json` sets the default |
 | `npx autoqe scan` | Run all guards and write `qe-report/qe-report.md` in one shot |
 | `npx autoqe run --root .` | Run all guards against the target repository |
 | `npx autoqe explain INV-CORE-01` | Explain one invariant or guard (`inv22`, `qe:guard:inv22` also work); `--json` for machines |
@@ -143,10 +146,12 @@ RATCHET status=ok regressions=0 improvements=0 tracked=0
 | `npm run qe` | All guards + ratchet comparison (non-zero exit on regression) |
 | `npm run qe:selftest` | Bad-sample verification |
 | `npm run qe:report` | Generate the Markdown report |
+| `npm run qe:triage` | Generate the fix / decide / record disposition list |
+| `npm run test:triage` | Policy self-check: every emitted finding code has a disposition; unknown codes never auto-waive |
 | `npm run qe:list` | Show the registry and its gaps |
 | `npm run qe:guard:invNN` | Run a single guard (`inv01`…`inv22`) |
 | `npm run qe:ratchet:update` | Tighten the baseline after a deliberate decision |
-| `npm run qe:ci` | typecheck + self-test + guards + report |
+| `npm run qe:ci` | typecheck + self-test + guards + triage self-check + report |
 | `npm run typecheck` | Type-check the toolkit (`tsconfig.qe.json`) |
 
 ## Repository layout

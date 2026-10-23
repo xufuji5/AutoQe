@@ -9,7 +9,7 @@
 | Attacker | Capability | Primary goal |
 |---|---|---|
 | Anonymous internet | Craft arbitrary bodies, headers, and paths | Unauthorized reads, endpoint flooding, injection |
-| Authenticated ordinary user | Tamper with parameters, replay requests, swap tenant IDs | Horizontal privilege escalation, duplicate coupon claims/orders |
+| Authenticated ordinary user | Tamper with parameters, replay requests, swap tenant IDs | Horizontal privilege escalation, duplicate submissions |
 | Hostile client environment | Read localStorage, tamper with stores | Steal tokens, forge state |
 | Internal misuse / AI-generated code | Call internal functions directly, bypass the entry point | Unauthenticated paths, validation gaps |
 
@@ -22,7 +22,7 @@ Criteria must live in a **layer that cannot be bypassed** (server entry point, d
 | 1 | Auth checks only "is logged in", never "is this record yours" | Object-level authorization; `ENTRY_NO_AUTH` catches only "no auth at all" |
 | 2 | The UI runs zod validation, the server takes the body as-is | `ENTRY_NO_VALIDATE` (inv20) |
 | 3 | No request-body size limit; a 10 MB JSON body exhausts memory | INV-SEC-02(open): middleware/gateway limit |
-| 4 | No rate limiting on login/checkout; scripts can hammer them | INV-SEC-02(open): rate limiting |
+| 4 | No rate limiting on login/submit; scripts can hammer them | INV-SEC-02(open): rate limiting |
 | 5 | Missing idempotency key; replayed requests double-decrement | `MUTATION_NO_IDEMPOTENCY` (inv20 warning) |
 | 6 | Error responses return stack traces/SQL/internal IDs | Review + unified error mapping |
 | 7 | Token persisted by Zustand persist; one XSS script reads it | `PERSIST_SENSITIVE` (inv22 error) |
@@ -55,7 +55,7 @@ Skip any one of the four steps and some real-world scenario will slip through si
 ### 3.3 Resources: size / rate / depth
 
 - Request-body limit (Next.js route layer or gateway): keep it at or below 1 MB; file uploads go through a separate channel.
-- Rate limiting per user / per IP: login, checkout, export, search.
+- Rate limiting per user / per IP: login, submit, export, search.
 - Hard cap on pagination (e.g. `take <= 100`); never pass `take` straight through to Prisma.
 - Cap on recursion/nesting depth (especially GraphQL or tree-shaped imports).
 

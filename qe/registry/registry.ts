@@ -30,7 +30,7 @@ export const registry: Invariant[] = [
     statement: '枚举的每个取值至少有一条产生路径（写入点）',
     defectClasses: ['建了没接线', '登记制失效'],
     guard: 'qe:guard:inv03',
-    badSample: 'qe/fixtures/inv03-dead-enum/bad（CANCELLED 只被读、无任何写点）',
+    badSample: 'qe/fixtures/inv03-dead-enum/bad（CLOSED 零出现、APPROVED 只有读侧）',
     status: 'enforced',
     c7: ['C-判例-14'],
   },

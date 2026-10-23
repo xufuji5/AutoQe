@@ -12,7 +12,7 @@ export const inv07 = defineGuard({
   blindSpots: [
     '只验「判据存在 / 控件存在」字符串，不验控件是否可达、是否真的提交该字段',
     '闸清单来自 qe.contracts.json，未登记的闸不在射程',
-    '小程序/离线队列等消费端需在各仓 AC 配置里列入 roots 才能覆盖',
+    '移动端/离线队列等消费端需在各仓 AC 配置里列入 roots 才能覆盖',
   ],
   async run(ctx) {
     const contracts = await loadContracts(ctx.root, ctx.config)

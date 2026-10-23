@@ -35,20 +35,20 @@ T2: write balance = 90   -- also debits 10, but only one debit actually happened
 ### 3.1 Uniqueness
 
 ```prisma
-model Order {
+model Request {
   id          String   @id @default(cuid())
   tenantId    String
-  orderNo     String
-  status      OrderStatus @default(PENDING)
-  totalCents  Int
+  requestNo   String
+  status      RequestStatus @default(DRAFT)
+  amountCents Int
   version     Int      @default(0)
   deletedAt   DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@unique([tenantId, orderNo])   // business uniqueness must live in the DB
+  @@unique([tenantId, requestNo])   // business uniqueness must live in the DB
   @@index([tenantId, status, createdAt])
-  @@map("orders")
+  @@map("requests")
 }
 ```
 
@@ -57,11 +57,11 @@ Criterion: **any business uniqueness enforced by "check then insert" must also e
 ### 3.2 Conditional update (state machine)
 
 ```ts
-const updated = await prisma.order.updateMany({
-  where: { id, status: 'PENDING' },
-  data: { status: 'PAID', paidAt: new Date() },
+const updated = await prisma.request.updateMany({
+  where: { id, status: 'DRAFT' },
+  data: { status: 'APPROVED', approvedAt: new Date() },
 })
-if (updated.count === 0) throw new ConflictError('ORDER_STATE_CONFLICT')
+if (updated.count === 0) throw new ConflictError('REQUEST_STATE_CONFLICT')
 ```
 
 Criterion: a state transition must carry a "precondition state" predicate and must check `count`. A bare `update({ where: { id } })` is treated as a lost-update risk.
@@ -70,16 +70,16 @@ Criterion: a state transition must carry a "precondition state" predicate and mu
 
 ```ts
 await prisma.$transaction(async (tx) => {
-  const rows = await tx.order.updateMany({
-    where: { id, status: 'PENDING', version },
-    data: { status: 'PAID', version: { increment: 1 } },
+  const rows = await tx.request.updateMany({
+    where: { id, status: 'DRAFT', version },
+    data: { status: 'APPROVED', version: { increment: 1 } },
   })
-  if (rows.count === 0) throw new ConflictError('ORDER_VERSION_CONFLICT')
-  await tx.ledger.create({ data: { orderId: id, amountCents, direction: 'IN' } })
+  if (rows.count === 0) throw new ConflictError('REQUEST_VERSION_CONFLICT')
+  await tx.ledger.create({ data: { requestId: id, amountCents, direction: 'IN' } })
 })
 ```
 
-- Read–judge–write for money and inventory must share one transaction.
+- Read–judge–write for money and asset balances must share one transaction.
 - Hot rows use optimistic locking (`version`) or `SELECT … FOR UPDATE` (in Prisma this requires `$queryRaw`).
 - Deadlocks and serialization failures must be **classified and retried** (bounded attempts + backoff); never swallow them as success.
 

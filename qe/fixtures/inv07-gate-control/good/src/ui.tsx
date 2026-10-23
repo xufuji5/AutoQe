@@ -1,7 +1,7 @@
-export const ListingForm = {
-  fields: ['title', 'qcReportUrl', 'stockQty'],
+export const PublishForm = {
+  fields: ['title', 'approvalReportUrl', 'quotaQty'],
 }
 
 export function renderFields(): string {
-  return ListingForm.fields.join(',')
+  return PublishForm.fields.join(',')
 }

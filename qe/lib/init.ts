@@ -46,6 +46,7 @@ const CONFIG_TEMPLATE = (opts: { schemaPath: string | null; sourceRoots: string[
       packageJson: 'package.json',
       ledger: 'qe/ledger/incidents.json',
       auditDir: 'qe-audit',
+      locale: 'en',
       metaGuards: false,
     },
     null,

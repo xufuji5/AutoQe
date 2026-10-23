@@ -1,11 +1,11 @@
-enum OrderStatus {
-  PENDING
-  PAID
-  SHIPPED
-  CANCELLED
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  CLOSED
 }
 
-model Order {
-  id     String      @id @default(cuid())
-  status OrderStatus @default(PENDING)
+model Request {
+  id     String        @id @default(cuid())
+  status RequestStatus @default(DRAFT)
 }

@@ -11,7 +11,7 @@
 | 攻击者 | 能力 | 主要目标 |
 |---|---|---|
 | 匿名公网 | 任意构造请求体/头/路径 | 越权读、刷接口、注入 |
-| 已登录普通用户 | 改请求参数、重放、切租户 id | 横向越权、重复领券/下单 |
+| 已登录普通用户 | 改请求参数、重放、切租户 id | 横向越权、重复提交 |
 | 恶意前端环境 | 读 localStorage、篡改 store | 窃取 token、伪造状态 |
 | 内部误用/AI 生成代码 | 直接调用内部函数、绕过入口 | 无鉴权路径、校验缺口 |
 
@@ -24,7 +24,7 @@
 | 1 | 鉴权只判断「已登录」，不判断「这条数据是不是你的」 | 对象级授权；`ENTRY_NO_AUTH` 只能兜住「完全没鉴权」 |
 | 2 | UI 做了 zod 校验，服务端直接收 body | `ENTRY_NO_VALIDATE`（inv20） |
 | 3 | 请求体无体积上限，10MB JSON 打满内存 | INV-SEC-02(open)：middleware/网关上限 |
-| 4 | 登录/下单接口无限流，脚本可刷 | INV-SEC-02(open)：速率限制 |
+| 4 | 登录/提交接口无限流，脚本可刷 | INV-SEC-02(open)：速率限制 |
 | 5 | 幂等键缺失，重放请求重复扣减 | `MUTATION_NO_IDEMPOTENCY`（inv20 告警） |
 | 6 | 错误响应回传堆栈/SQL/内部 id | 评审 + 统一错误映射 |
 | 7 | token 被 Zustand persist 落盘，XSS 直接读走 | `PERSIST_SENSITIVE`（inv22 判红） |
@@ -57,7 +57,7 @@ export async function POST(request: Request): Promise<Response> {
 ### 3.3 资源：体积 / 频率 / 深度
 
 - 请求体上限（Next.js route 层或网关）：建议 1MB 以内，文件上传走独立通道。
-- 每用户/每 IP 限流：登录、下单、导出、搜索。
+- 每用户/每 IP 限流：登录、提交、导出、搜索。
 - 分页强制上限（如 `take <= 100`）；禁止把 `take` 直接透传给 Prisma。
 - 递归/嵌套深度上限（尤其 GraphQL 或树形导入）。
 

@@ -76,7 +76,7 @@ export const inv03 = defineGuard({
       },
     },
     {
-      name: 'bad：CANCELLED 零出现、SHIPPED 只有读侧',
+      name: 'bad：CLOSED 零出现、APPROVED 只有读侧',
       root: path.join(FIXTURES, 'bad'),
       expect: 'red',
       minErrors: 2,

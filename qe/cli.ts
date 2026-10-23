@@ -11,6 +11,7 @@ import { runSelfTest } from './lib/selftest.ts'
 import { loadIncidentMetrics, writeReport } from './lib/report.ts'
 import { compareRatchet, ratchetLine, writeBaseline } from './lib/ratchet.ts'
 import { decideStatus, nextStepFor, readBatches } from './lib/status.ts'
+import { applyPackageAliases, triage, triageLines, writeTriage, type Locale } from './lib/triage.ts'
 import { initProject } from './lib/init.ts'
 import type { GuardReadout } from './lib/report.ts'
 import type { Guard } from './lib/guard.ts'
@@ -44,6 +45,7 @@ async function main(): Promise<void> {
     else if (command === 'init') await cmdInit()
     else if (command === 'doctor') await cmdDoctor()
     else if (command === 'status') await cmdStatus()
+    else if (command === 'triage') await cmdTriage()
     else if (command === 'explain') cmdExplain()
     else if (command === 'prompt') await cmdPrompt()
     else if (command === 'selftest') await cmdSelftest()
@@ -52,7 +54,7 @@ async function main(): Promise<void> {
     else if (command === 'list') cmdList()
     else {
       console.error(
-        `QE_FATAL unknown command: ${command} (available: help / init / doctor / status / run / explain / prompt / report / list / selftest / ratchet-update)`,
+        `QE_FATAL unknown command: ${command} (available: help / init / doctor / status / triage / run / explain / prompt / report / list / selftest / ratchet-update)`,
       )
       process.exitCode = 2
     }
@@ -72,6 +74,7 @@ GETTING STARTED
   autoqe init                  scaffold qe.config.json, QE-00…09, qe/templates into this project
   autoqe doctor                check Node/config/schema/sources/baseline and print the next step
   autoqe status                stop-or-continue verdict from batch output + open gaps + ratchet
+  autoqe triage                sort findings into fix / decide / record and write qe-report/triage.md
   autoqe scan                  run all guards and write qe-report/qe-report.md in one shot
   autoqe run --root .          run all guards
   autoqe explain INV-CORE-01   explain one invariant (or a guard id such as inv22)
@@ -88,6 +91,8 @@ OPTIONS
   --only <id>      run a single guard, e.g. --only inv22
   --verbose        print blind spots and info-level findings
   --json           machine-readable output (explain, list)
+  --apply          with triage: apply mechanical, additive fixes only (package aliases)
+  --lang <en|zh>   human-facing output language for triage (default: config.locale, else en)
   --force          overwrite files during init
   --help           show this help
 
@@ -261,6 +266,28 @@ async function cmdStatus(): Promise<void> {
   ]
   console.log(lines.join('\n'))
   if (verdict.decision === 'REPAIR') process.exitCode = 1
+}
+
+async function cmdTriage(): Promise<void> {
+  const config = await loadConfig(root)
+  const readouts = await execute(true)
+  let applied: string[] = []
+  if (flags.apply === true) {
+    applied = await applyPackageAliases(root, config, registry)
+  }
+  const result = triage(readouts)
+  const locale: Locale = (typeof flags.lang === 'string' ? flags.lang : config.locale) === 'zh' ? 'zh' : 'en'
+  for (const line of triageLines(result, locale)) console.log(line)
+  if (flags.apply === true) {
+    console.log(`TRIAGE_APPLIED aliases=${applied.length}${applied.length ? ' [' + applied.join(',') + ']' : ''}`)
+  }
+  const { jsonFile, mdFile } = await writeTriage(root, result, readouts, applied, cli, locale)
+  console.log(`TRIAGE_REPORT json=${path.relative(root, jsonFile)} md=${path.relative(root, mdFile)}`)
+  const next =
+    locale === 'zh'
+      ? `TRIAGE_NEXT ${result.fix + result.decide > 0 ? `从「今天只做这些」开始，处置完跑 ${cli} triage 复核` : `没有待办；用 ${cli} run --root . 做一次全量复核`}`
+      : `TRIAGE_NEXT ${result.fix + result.decide > 0 ? `start from "Today's list"; re-run ${cli} triage after the batch` : `nothing actionable; re-check with ${cli} run --root .`}`
+  console.log(next)
 }
 
 function cmdExplain(): void {

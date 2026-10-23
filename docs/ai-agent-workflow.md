@@ -20,10 +20,11 @@ npx autoqe doctor              # catches missing config/schema/source roots befo
 
 # every round
 npx autoqe run --root .        # 1. deterministic facts
-npx autoqe prompt audit        # 2. prints the facts + task + rules as one paste-ready prompt
-# 3. the agent writes qe-audit/<project>-<date>/*.md with file:line evidence
-# 4. fix a batch, run again, compare RATCHET
-# 5. after the batch, ask the stop criterion instead of deciding by feel
+npx autoqe triage --root .     # 2. split facts into fix / decide / record (today list ≤ 5)
+npx autoqe prompt audit        # 3. prints the facts + task + rules as one paste-ready prompt
+# 4. the agent writes qe-audit/<project>-<date>/*.md with file:line evidence
+# 5. fix a batch, run again, compare RATCHET
+# 6. after the batch, ask the stop criterion instead of deciding by feel
 npx autoqe status --root .     # CONTINUE-MINING / STOP-MINING / REPAIR / ADJUDICATE
 ```
 
@@ -34,6 +35,16 @@ finding into the prompt, so the model never has to re-interpret a pasted summary
 ```bash
 npx autoqe prompt audit --root . > prompt.txt
 ```
+
+`autoqe triage` answers "what do I do next" without a meeting. It writes `qe-report/triage.md` with:
+
+- **fix** — one mechanically correct action (the only bucket `--apply` may touch, and only for additive package-alias edits);
+- **decide** — 2–3 options with a recommendation; a human picks one;
+- **record** — traceability only, no runtime risk; produces a waiver draft with `reviewBy`.
+
+Unregistered finding codes always land in **decide**, never in **record**. The today list is capped at five,
+so the output is a finishable queue rather than a second backlog. `npm run test:triage` fails when a guard
+emits a code with no disposition, which keeps the judgment layer in sync with the guard layer.
 
 `init` writes `qe.config.json`, `QE-00`…`QE-09`, `qe/templates/`, `qe.contracts.json`, and `AGENTS.md`
 (or `AGENTS.autoqe.md` if the project already has one — merge it by hand, never overwrite host rules).

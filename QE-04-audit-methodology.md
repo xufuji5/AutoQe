@@ -215,7 +215,7 @@ A guard is not trusted until it fails against a bad sample constructed independe
 
 ### 4.5 Criteria judge invariants, not implementations
 
-A criterion written against the current implementation becomes insensitive to the exact change it was meant to catch. A probe that asserts "compensation implies no shipment row" can stay green when the stage predicate changes, while a probe that asserts "value has left the account implies the case must be closed" catches it. This is why probes name invariants.
+A criterion written against the current implementation becomes insensitive to the exact change it was meant to catch. A probe that asserts "a close event implies no open child row" can stay green when the stage predicate changes, while a probe that asserts "value has left the account implies the case must be closed" catches it. This is why probes name invariants.
 
 It also implies a review rule: after a fix, re-check the neighboring faces against the same invariant table. Verifying only that the original symptom disappeared is how a fix creates the next hole. "Admission strict, closure wide" is the same idea on closure paths: once value has already left, ask "will continuing mis-record the books?" rather than "do the original admission conditions still hold?".
 
