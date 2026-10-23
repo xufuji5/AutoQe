@@ -1,0 +1,7 @@
+{
+  "name": "fixture-bad",
+  "private": true,
+  "scripts": {
+    "qe:bad": "node scripts/missing.ts"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "promises": [
+    {
+      "id": "PR-01",
+      "claim": "未通过质检报告闸门的商品不可上架",
+      "source": {
+        "file": "docs/rules.md",
+        "contains": "未通过质检报告闸门的商品不可上架"
+      },
+      "backing": {
+        "roots": ["src"],
+        "pattern": "QC_REPORT_REQUIRED"
+      }
+    }
+  ],
+  "gates": []
+}

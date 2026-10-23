@@ -1,0 +1,40 @@
+name: qe
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Bad-sample counter-proof (false red and false green both fail)
+        run: npm run qe:selftest
+      - name: Invariant guards (exit code is the verdict)
+        run: npm run test:invariants
+      - name: Health metrics report
+        run: npm run qe:report
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qe-report
+          path: qe-report/
+          if-no-files-found: ignore

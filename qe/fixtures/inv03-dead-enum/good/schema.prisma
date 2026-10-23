@@ -1,0 +1,10 @@
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+}
+
+model Order {
+  id     String      @id @default(cuid())
+  status OrderStatus @default(PENDING)
+}

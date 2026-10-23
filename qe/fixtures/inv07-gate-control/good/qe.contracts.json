@@ -1,0 +1,17 @@
+{
+  "promises": [],
+  "gates": [
+    {
+      "id": "GATE-QC",
+      "reject": "缺少质检报告不可上架",
+      "server": { "roots": ["src"], "pattern": "QC_REPORT_REQUIRED" },
+      "control": { "roots": ["src"], "pattern": "qcReportUrl" }
+    },
+    {
+      "id": "GATE-STOCK",
+      "reject": "库存不足不可下单",
+      "server": { "roots": ["src"], "pattern": "STOCK_INSUFFICIENT" },
+      "control": { "roots": ["src"], "pattern": "stockQty" }
+    }
+  ]
+}

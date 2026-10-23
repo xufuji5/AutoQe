@@ -1,0 +1,19 @@
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  COMPLETED
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  tenantId   String
+  status     OrderStatus @default(PENDING)
+  totalCents Int
+  buyerNote  String?
+  archivedAt DateTime? /// @archive 仅审计导出读取
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@map("orders")
+}

@@ -1,0 +1,30 @@
+{
+  "schema": {
+    "provider": "prisma",
+    "path": "qe/demo/prisma/schema.prisma",
+    "clientNames": ["prisma", "db", "tx"]
+  },
+  "source": {
+    "collector": "ts",
+    "roots": ["qe/demo/src"]
+  },
+  "ignore": ["node_modules", "dist", "build", ".next", "coverage", ".git", "qe/fixtures", "qe-report"],
+  "systemFields": {
+    "id": "框架生成（cuid/uuid/自增）",
+    "createdAt": "框架生成（@default(now)）",
+    "updatedAt": "框架生成（@updatedAt）",
+    "deletedAt": "软删助手统一写入"
+  },
+  "fieldExemptions": [],
+  "contracts": "qe/demo/qe.contracts.json",
+  "boundaries": {
+    "publicRoutes": []
+  },
+  "stores": {
+    "moduleRoots": ["qe/demo/src/features", "qe/demo/src/modules"]
+  },
+  "scriptsDirs": ["scripts"],
+  "guardsDir": "qe/guards",
+  "packageJson": "package.json",
+  "ledger": "qe/ledger/incidents.json"
+}

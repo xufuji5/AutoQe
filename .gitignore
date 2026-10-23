@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+coverage/
+
+# QE generated artifacts
+qe-report/
+qe-audit/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.trae/
+
+# Internal business-domain documents (not part of the public package)
+业务域/
+
+# Chinese edition of QE-04 contains internal case histories; only the redacted English edition ships
+docs/zh-CN/QE-04-audit-methodology.zh-CN.md

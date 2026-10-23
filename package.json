@@ -1,0 +1,52 @@
+{
+  "name": "ai-qe-toolkit",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Quality Engineering toolkit for AI-assisted development: invariant registry, static guards, bad-sample self-tests and a ratchet baseline.",
+  "license": "MIT",
+  "keywords": [
+    "quality-engineering",
+    "static-analysis",
+    "invariants",
+    "ai-coding",
+    "prisma",
+    "nextjs",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xufuji5/ai-qe-toolkit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xufuji5/ai-qe-toolkit/issues"
+  },
+  "homepage": "https://github.com/xufuji5/ai-qe-toolkit#readme",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.qe.json",
+    "qe": "node qe/cli.ts run",
+    "qe:list": "node qe/cli.ts list",
+    "qe:selftest": "node qe/cli.ts selftest",
+    "qe:report": "node qe/cli.ts report",
+    "test:invariants": "node qe/cli.ts run",
+    "test:invariants-selftest": "node qe/cli.ts selftest",
+    "qe:guard:inv01": "node qe/cli.ts run --only inv01",
+    "qe:guard:inv02": "node qe/cli.ts run --only inv02",
+    "qe:guard:inv03": "node qe/cli.ts run --only inv03",
+    "qe:guard:inv06": "node qe/cli.ts run --only inv06",
+    "qe:guard:inv07": "node qe/cli.ts run --only inv07",
+    "qe:guard:inv13": "node qe/cli.ts run --only inv13",
+    "qe:guard:inv20": "node qe/cli.ts run --only inv20",
+    "qe:guard:inv21": "node qe/cli.ts run --only inv21",
+    "qe:guard:inv22": "node qe/cli.ts run --only inv22",
+    "qe:ratchet": "node qe/cli.ts run",
+    "qe:ratchet:update": "node qe/cli.ts ratchet-update",
+    "qe:ci": "npm run typecheck && npm run qe:selftest && npm run test:invariants && npm run qe:report"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.0",
+    "typescript": "5.9.3"
+  }
+}
