@@ -75,6 +75,7 @@ function finishBlock(
 
   let table = block.name
   const fields: SchemaField[] = []
+  const uniques: string[] = []
   let pendingComment = ''
   block.body.forEach((raw, idx) => {
     const lineNo = offset + idx + 1
@@ -88,6 +89,20 @@ function finishBlock(
     if (trimmed.startsWith('@@map')) {
       const m = /@@map\("([^"]+)"\)/.exec(trimmed)
       if (m) table = m[1]
+      pendingComment = ''
+      return
+    }
+    // @@unique([a, b]) / @@unique([a, b], map: "...")：复合唯一键
+    if (trimmed.startsWith('@@unique')) {
+      const m = /@@unique\(\s*\[([^\]]*)\]/.exec(trimmed)
+      if (m) {
+        const key = m[1]
+          .split(',')
+          .map((s) => s.trim().replace(/[`"]/g, ''))
+          .filter(Boolean)
+          .join(',')
+        if (key) uniques.push(key)
+      }
       pendingComment = ''
       return
     }
@@ -107,6 +122,7 @@ function finishBlock(
     const isList = Boolean(listMark)
     const isRelation = Boolean(rest.includes('@relation')) || modelNames.has(baseType)
     const mapMatch = /@map\("([^"]+)"\)/.exec(rest)
+    if (/(^|\s)@unique(\s|\(|$)/.test(rest)) uniques.push(name)
     fields.push({
       name,
       column: mapMatch ? mapMatch[1] : name,
@@ -121,7 +137,7 @@ function finishBlock(
   })
 
   if (!fields.length) return
-  models.push({ name: block.name, table, fields, line: block.line })
+  models.push({ name: block.name, table, fields, uniques, line: block.line })
 }
 
 export const prismaSchemaProvider: SchemaProvider = {

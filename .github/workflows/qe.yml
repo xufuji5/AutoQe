@@ -29,6 +29,10 @@ jobs:
         run: npm run qe:selftest
       - name: Invariant guards (exit code is the verdict)
         run: npm run test:invariants
+      - name: Knowledge base shape (no rule without a recorded incident)
+        run: npm run qe:skills
+      - name: Project-info leak audit (local paths, credential shapes)
+        run: npm run qe:guard:leak
       - name: Health metrics report
         run: npm run qe:report
       - name: Upload report artifact

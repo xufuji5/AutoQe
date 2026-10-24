@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import path from 'node:path'
 import { existsSync } from 'node:fs'
-import { loadConfig } from './lib/config.ts'
+import { loadConfig, mergeConfig } from './lib/config.ts'
 import { readTextSafe, walkFiles } from './lib/fs.ts'
 import { registry } from './registry/registry.ts'
 import { guards } from './guards/index.ts'
@@ -24,6 +24,7 @@ import {
   type Locale,
 } from './lib/triage.ts'
 import { initProject } from './lib/init.ts'
+import { loadSkills, skillsChecklist, skillsTable, validateSkills } from './lib/skills.ts'
 import type { GuardReadout } from './lib/report.ts'
 import type { Guard } from './lib/guard.ts'
 
@@ -71,16 +72,37 @@ async function main(): Promise<void> {
     else if (command === 'selftest') await cmdSelftest()
     else if (command === 'report') await cmdReport()
     else if (command === 'ratchet-update') await cmdRatchetUpdate()
+    else if (command === 'skills') await cmdSkills()
     else if (command === 'list') cmdList()
     else {
       console.error(
-        `QE_FATAL unknown command: ${command} (available: help / init / doctor / status / triage / waive / run / explain / prompt / report / list / selftest / ratchet-update)`,
+        `QE_FATAL unknown command: ${command} (available: help / init / doctor / status / triage / waive / run / explain / prompt / report / list / skills / selftest / ratchet-update)`,
       )
       process.exitCode = 2
     }
   } catch (e) {
     console.error(`QE_FATAL ${(e as Error).message}`)
     process.exitCode = 1
+  }
+}
+
+/**
+ * 配置解析：目标仓的 `qe.config.json` 为基线，`--config <file>`（或 `AUTOQE_CONFIG`）在上层覆盖。
+ *
+ * 存在的理由：审计别人的仓不该往人家的仓库里写文件。把「这个仓怎么接」写成引擎这边的一份配置，
+ * 就能做到「引擎一份、账本在引擎这边、目标仓零改动」—— 这也是跨项目复用不产生第二份引擎的前提。
+ */
+async function currentConfig(): Promise<Awaited<ReturnType<typeof loadConfig>>> {
+  const base = await loadConfig(root)
+  const override = typeof flags.config === 'string' ? flags.config : process.env.AUTOQE_CONFIG
+  if (!override) return base
+  const file = path.isAbsolute(override) ? override : path.resolve(root, override)
+  const text = await readTextSafe(file)
+  if (text === null) throw new Error(`--config 指向的文件不存在：${file}`)
+  try {
+    return mergeConfig(base, JSON.parse(text) as Record<string, never>)
+  } catch (e) {
+    throw new Error(`--config 文件解析失败：${file}：${(e as Error).message}`)
   }
 }
 
@@ -102,6 +124,9 @@ GETTING STARTED
   autoqe prompt audit          print a ready-to-paste prompt with the current readings
 
 EVERYDAY COMMANDS
+  autoqe skills                list the accident knowledge base (why each rule exists)
+  autoqe skills --check        validate it (missing provenance / self-question = error)
+  autoqe skills --checklist    print an audit checklist generated from it (do not hand-maintain)
   autoqe list                  list all invariants with status
   autoqe report --root .       write qe-report/qe-report.md
   autoqe ratchet-update        freeze current counts as the baseline (only after human triage)
@@ -109,6 +134,8 @@ EVERYDAY COMMANDS
 
 OPTIONS
   --root <dir>     target project root (default: current directory)
+  --config <file>  overlay a config file on top of <root>/qe.config.json (or set AUTOQE_CONFIG)
+                   lets you audit a repository without writing anything into it
   --only <id>      run a single guard, e.g. --only inv22
   --verbose        print blind spots and info-level findings
   --json           machine-readable output (explain, list)
@@ -162,7 +189,7 @@ async function cmdDoctor(): Promise<void> {
   const hasConfig = existsSync(configFile)
   rows.push(`${hasConfig ? 'OK  ' : 'WARN'} config ${hasConfig ? 'qe.config.json' : 'missing -> npx autoqe init'}`)
 
-  const config = await loadConfig(root)
+  const config = await currentConfig()
   const schemaFile = path.resolve(root, config.schema.path)
   if (config.schema.provider === 'none') {
     rows.push('SKIP schema provider=none (schema-dependent guards will be skipped)')
@@ -235,7 +262,7 @@ async function cmdDoctor(): Promise<void> {
 }
 
 async function cmdStatus(): Promise<void> {
-  const config = await loadConfig(root)
+  const config = await currentConfig()
   const locale: Locale = (typeof flags.lang === 'string' ? flags.lang : config.locale) === 'zh' ? 'zh' : 'en'
   const readouts = await execute(true)
   const ratchet = await compareRatchet(root, readouts)
@@ -313,7 +340,7 @@ async function cmdStatus(): Promise<void> {
 }
 
 async function cmdTriage(): Promise<void> {
-  const config = await loadConfig(root)
+  const config = await currentConfig()
   const external = typeof flags['from-report'] === 'string' ? flags['from-report'] : typeof flags.from === 'string' ? flags.from : undefined
   const readouts = external ? await readExternalFindings(path.resolve(root, external)) : await execute(true)
   let applied: string[] = []
@@ -347,7 +374,7 @@ async function cmdWaive(): Promise<void> {
     process.exitCode = 2
     return
   }
-  const config = await loadConfig(root)
+  const config = await currentConfig()
   const { file, waiver } = await addWaiver(root, config, {
     code,
     reason: typeof flags.reason === 'string' ? flags.reason : '',
@@ -496,7 +523,7 @@ async function cmdRatchetUpdate(): Promise<void> {
 }
 
 async function execute(silent = false): Promise<GuardReadout[]> {
-  const config = await loadConfig(root)
+  const config = await currentConfig()
   const selected = selectGuards()
   if (selected.length === 0) {
     console.error(`QE_FATAL 未找到匹配 --only=${only} 的守卫`)
@@ -545,7 +572,7 @@ async function cmdSelftest(): Promise<void> {
 async function cmdReport(): Promise<void> {
   const selected = selectGuards()
   const selftest = await runSelfTest(selected, registry)
-  const config = await loadConfig(root)
+  const config = await currentConfig()
   if (typeof flags.lang === 'string') config.locale = flags.lang === 'zh' ? 'zh' : 'en'
   const readouts: GuardReadout[] = []
   for (const guard of selected) {
@@ -566,6 +593,34 @@ async function cmdReport(): Promise<void> {
   console.log(`METRICS invariants=${metrics.invariants.total} enforced=${metrics.invariants.enforced} partial=${metrics.invariants.partial} open=${metrics.invariants.open} enforcedCoverage=${metrics.enforcedCoverage}% zeroWriter=${metrics.zeroWriter} deadEnum=${metrics.deadEnum} selftest=${metrics.selftest.passed}/${metrics.selftest.cases} skipped=${metrics.skipped} incidents=${metrics.incidents.rate === null ? 'n/a' : metrics.incidents.rate + '%'}`)
   console.log(`REPORT json=${path.relative(root, jsonFile)} md=${path.relative(root, mdFile)} status=${metrics.status}`)
   if (metrics.status === 'red') process.exitCode = 1
+}
+
+/**
+ * 事故知识库入口。三种用法对应三种消费方式：
+ *   列出（谁、哪类、连哪条规则）／校验（缺出处、缺自省问题）／生成清单（立项与复盘当场用）。
+ */
+async function cmdSkills(): Promise<void> {
+  const dir = path.join(import.meta.dirname, 'skills')
+  const skills = await loadSkills(dir)
+  if (skills.length === 0) {
+    console.error(`QE_FATAL 知识库为空：${dir}（0 条不等于没有问题）`)
+    process.exitCode = 1
+    return
+  }
+  if (flags.checklist === true) {
+    console.log(skillsChecklist(skills))
+    return
+  }
+  const { errors, warnings } = validateSkills(skills)
+  if (flags.check === true) {
+    for (const w of warnings) console.log(`WARN ${w}`)
+    for (const e of errors) console.log(`ERROR ${e}`)
+    console.log(`SKILLS total=${skills.length} errors=${errors.length} warnings=${warnings.length}`)
+    if (errors.length > 0) process.exitCode = 1
+    return
+  }
+  console.log(skillsTable(skills))
+  console.log(`SKILLS total=${skills.length}（--check 校验形状 / --checklist 生成审计清单）`)
 }
 
 function cmdList(): void {

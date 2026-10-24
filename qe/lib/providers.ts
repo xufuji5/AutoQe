@@ -21,6 +21,13 @@ export interface SchemaModel {
   name: string
   table: string
   fields: SchemaField[]
+  /**
+   * 唯一约束清单：每项是「逗号连接的字段名」。
+   * 单列 `@unique` → 'email'；复合 `@@unique([a, b])` → 'a,b'。
+   * 存在这一栏的理由：`先查后写` 是否构成静默双写，只有 schema 能回答
+   * （有唯一约束 → 并发撞库报错；没有 → 静默两条）。代码本身长得一模一样。
+   */
+  uniques: string[]
   line: number
 }
 

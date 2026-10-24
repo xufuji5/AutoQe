@@ -39,6 +39,17 @@ export interface QeConfig {
   /** 前端模块边界与敏感字段词表 */
   stores?: Partial<StoreConfig>
   /**
+   * 规则层选项：`rules[ruleId]`，只用于**消除误报**（公开路由声明、租户列清单、豁免表…）。
+   * 纪律：误报一律在这里解决，不许改判据代码 —— 改代码等于给每个项目开一个分支，
+   * 跨项目复用当场消失，「引擎只有一份」随之破功。
+   */
+  rules?: Record<string, Record<string, unknown>>
+  /** 公开前的身份信息校验（leak-project-info） */
+  leak?: {
+    /** 项目代号黑名单文件；可指向本仓之外。缺省只查本机路径与凭据形态 */
+    denylist?: string
+  }
+  /**
    * 是否校验本仓内置的守卫装配（inv13：别名、坏样本、孤儿守卫）。
    * CLI 模式下守卫在 npm 包里，本仓没有 qe/guards，应设为 false。
    */
@@ -67,6 +78,7 @@ export const defaultConfig: QeConfig = {
   auditDir: 'qe-audit',
   locale: 'en',
   metaGuards: true,
+  rules: {},
 }
 
 /** 深度合并嵌套配置块（schema/source/systemFields），数组整体替换 */

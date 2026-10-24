@@ -8,7 +8,13 @@ async function requireUser(): Promise<{ id: string }> {
 
 export async function POST(request: Request): Promise<Response> {
   const user = await requireUser()
-  const body = requestSchema.parse(await request.json())
+  // 解析与校验放在同一个 try 里：畸形 JSON 与「形状不对」都属于 4xx，不该冒成 500
+  let body: unknown
+  try {
+    body = requestSchema.parse(await request.json())
+  } catch {
+    return Response.json({ error: 'INVALID_BODY' }, { status: 400 })
+  }
   const idempotencyKey = request.headers.get('Idempotency-Key')
   if (!idempotencyKey) return Response.json({ error: 'MISSING_KEY' }, { status: 400 })
   return Response.json({ owner: user.id, body })

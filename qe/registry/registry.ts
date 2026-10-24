@@ -38,9 +38,10 @@ export const registry: Invariant[] = [
     id: 'INV-CORE-04',
     statement: '同一状态判据只允许一份定义（副本即红）',
     defectClasses: ['漂移'],
-    status: 'open',
-    openReason: '状态字面量单源判据未实现；当前靠 code review，无法机器判定「同一份」的边界',
-    revisitBy: '2026-12-31',
+    guard: 'qe:guard:aq02',
+    badSample: 'qe/rules/AQ002-status-bypass.ts 的 fixtures（裸字面量比较 vs 谓词调用）',
+    status: 'enforced',
+    decidedAt: '2026-10-24',
   },
   {
     id: 'INV-CORE-05',
@@ -72,9 +73,10 @@ export const registry: Invariant[] = [
     id: 'INV-CORE-08',
     statement: '多租户的一切写带租户谓词，身份/豁免表也在射程',
     defectClasses: ['接缝'],
-    status: 'open',
-    openReason: '租户模型清单与豁免表尚未登记，判据依赖每个仓的 schema 约定，需按仓接入后再升 enforced',
-    revisitBy: '2026-12-31',
+    guard: 'qe:guard:aq05',
+    status: 'partial',
+    gap: '射程只到「手写 SQL 的模板串里有没有收敛列」；Prisma 参数化写默认带 where，不判；条件拼进变量的写法、视图/CTE 内的收敛不可见；启用数据库 RLS 的仓需声明 rlsEnforced',
+    decidedAt: '2026-10-24',
   },
   {
     id: 'INV-CORE-09',
@@ -104,9 +106,10 @@ export const registry: Invariant[] = [
     id: 'INV-CORE-12',
     statement: '写路径不得 check-then-act，并发热点有锁与冲突分类',
     defectClasses: ['并发正确性'],
-    status: 'open',
-    openReason: '静态扫描 check-then-act 误报率高，需先建立 ratchet 基线与豁免清单，避免假红消耗信任',
-    revisitBy: '2026-12-31',
+    guard: 'qe:guard:aq04',
+    status: 'partial',
+    gap: '只判「同文件内 先查 → 判空 → 建」且目标表无唯一键；并发热点的锁与冲突分类要运行期探针；跨文件/跨服务的判空写入不可见',
+    decidedAt: '2026-10-24',
   },
   {
     id: 'INV-CORE-13',
@@ -141,6 +144,26 @@ export const registry: Invariant[] = [
     status: 'partial',
     gap: '以「守卫 + finding code」为计数单位，不区分同一 code 下不同实体的严重度；基线未覆盖 selftest 用例数',
     decidedAt: '2026-10-23',
+  },
+
+  {
+    id: 'INV-CORE-17',
+    statement: '写路径的异常必须被处置：空 catch 或只有日志，等于失败不留痕',
+    defectClasses: ['隐性陷阱'],
+    guard: 'qe:guard:aq03',
+    badSample: 'qe/rules/AQ003-catch-swallow.ts 的 fixtures（空 catch / 只有 console）',
+    status: 'partial',
+    gap: '只判 catch 体内最强的动作；「该吞不该吞」属语义，刻意降级的读路径不判；跨函数收口不可见',
+    decidedAt: '2026-10-24',
+  },
+  {
+    id: 'INV-CORE-18',
+    statement: '判据不得恒真：每条断言都要说得出「什么情况下它会红」',
+    defectClasses: ['测试方法论', '证据不足'],
+    guard: 'qe:guard:aq07',
+    badSample: 'qe/rules/AQ007-fake-green.ts 的 fixtures（七种假绿形态各一份）',
+    status: 'enforced',
+    decidedAt: '2026-10-24',
   },
 
   /* ---------- Next.js 服务端边界（真实对抗环境） ---------- */
@@ -182,6 +205,25 @@ export const registry: Invariant[] = [
     decidedAt: '2026-10-23',
   },
 
+  {
+    id: 'INV-WEB-05',
+    statement: '变更型入口对不可解析的请求体返回 4xx，不冒成 500',
+    defectClasses: ['隐性陷阱', '接缝'],
+    guard: 'qe:guard:aq01',
+    badSample: 'qe/rules/AQ001-body-parse.ts 的 fixtures（裸 request.json() 直通业务）',
+    status: 'enforced',
+    decidedAt: '2026-10-24',
+  },
+  {
+    id: 'INV-WEB-06',
+    statement: '鉴权判定按结构识别（使令动词 + 受保护对象），不靠函数名清单',
+    defectClasses: ['防线幻觉', '登记制失效'],
+    guard: 'qe:guard:aq06',
+    status: 'partial',
+    gap: '中间件统一注入的鉴权不可见，该前缀必须逐条声明；只认「函数调用」形态，取上下文权限位的写法可能漏判',
+    decidedAt: '2026-10-24',
+  },
+
   /* ---------- 客户端/服务端接缝（AI 分模块的缝） ---------- */
   {
     id: 'INV-SEC-01',
@@ -211,22 +253,34 @@ export const registry: Invariant[] = [
     revisitBy: '2026-12-31',
   },
 
+  {
+    id: 'INV-SEC-03',
+    statement: '按 id 取单条时必须带归属谓词，或查完显式校验归属',
+    defectClasses: ['接缝', '防线幻觉'],
+    guard: 'qe:guard:aq08',
+    status: 'partial',
+    gap: '公开资源（商品、文章）按 id 直取合法，语义不可判定；需人工过一轮并把核实过的路径写进 ownershipReviewed 才可升 enforced',
+    decidedAt: '2026-10-24',
+  },
+
   /* ---------- Prisma / PostgreSQL 并发正确性 ---------- */
   {
     id: 'INV-DB-01',
     statement: '并发写路径在事务/乐观锁/幂等键内，冲突有分类，不做 check-then-act',
     defectClasses: ['并发正确性', '接缝'],
-    status: 'open',
-    openReason: '静态识别 check-then-act 误报率高，需先有仓级事务封装登记与 ratchet 基线，再升 partial',
-    revisitBy: '2026-12-31',
+    guard: 'qe:guard:aq04',
+    status: 'partial',
+    gap: '只看代码形态（先查后写 + 无事务封装 + 无唯一键）；「冲突有分类」需要错误码目录与事务封装登记，尚未接入',
+    decidedAt: '2026-10-24',
   },
   {
     id: 'INV-DB-02',
     statement: '唯一性由数据库约束保证，不用先查后插替代',
     defectClasses: ['并发正确性', '隐性陷阱'],
-    status: 'open',
-    openReason: '需要把 Prisma schema 的 @@unique 清单与业务校验表对拍；缺仓级「业务唯一键」登记前无法判',
-    revisitBy: '2026-12-31',
+    guard: 'qe:guard:aq04',
+    status: 'partial',
+    gap: 'schema 的 @@unique/@unique 清单已自动提取并用于抑制误报；「业务上应唯一、schema 里没有」这一半仍缺仓级登记',
+    decidedAt: '2026-10-24',
   },
 
   /* ---------- Zustand 前端状态 ---------- */
@@ -248,5 +302,15 @@ export const registry: Invariant[] = [
     status: 'partial',
     gap: '只识别字面量配置对象；工厂函数、动态展开的 persist 配置无法静态求值',
     decidedAt: '2026-10-23',
+  },
+  /* ---------- 仓库自身（可公开发布的前置条件） ---------- */
+  {
+    id: 'INV-META-01',
+    statement: '本仓文件不得含宿主项目身份信息与凭据形态（公开即不可撤回）',
+    defectClasses: ['证据不足', '防线幻觉'],
+    guard: 'qe:guard:leak',
+    badSample: 'qe/fixtures/leak-project-info/bad（本机绝对路径 / 密钥形态 / 明文口令）',
+    status: 'enforced',
+    decidedAt: '2026-10-24',
   },
 ]

@@ -10,6 +10,8 @@ coverage/
 # QE generated artifacts
 qe-report/
 qe-audit/
+# 规则自证夹具（由 qe/rules 里的 inline 样本生成，随时可重建）
+qe/.fixtures-generated/
 
 # Logs
 *.log

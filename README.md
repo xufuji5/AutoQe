@@ -19,6 +19,11 @@ The repository has three layers:
 2. **Guards** (`qe/guards/*.ts`) — static scanners that emit findings and fail on `errors > 0`.
 3. **A project audit playbook** (`QE-03`) — a stack-agnostic checklist to assess any existing codebase,
    produce a reproducible bug ledger, and decide whether it can ship.
+4. **A rule layer + an accident knowledge base** (`qe/rules/`, `qe/skills/`) — rules are pure functions
+   (`analyze(src, rel) → hits`) so that the counter-example lives *in the same file* as the judgment;
+   the knowledge base records which real incident produced each rule, and prints itself as an audit
+   checklist (`autoqe skills --checklist`). A rule without a recorded incident is a rule invented for an
+   attacker who does not exist.
 
 ## What it is **not**
 
@@ -43,9 +48,12 @@ The repository has three layers:
 
 | Area | Contents |
 |---|---|
-| Registry | 27 invariants — 10 `enforced`, 5 `partial`, 12 `open` |
-| Guards | 9 scanners: `inv01`, `inv02`, `inv03`, `inv06`, `inv07`, `inv13`, `inv20`, `inv21`, `inv22` |
-| Self-test | 19 good/bad fixture cases (`npm run qe:selftest`) |
+| Registry | 33 invariants — 14 `enforced`, 12 `partial`, 7 `open` |
+| Guards | 18 scanners: 9 `inv*` (schema/AST) + 8 `aq*` (rules) + `leak-project-info` |
+| Rules | `qe/rules/` — pure-function judgments, each with its counter-examples inline |
+| Knowledge base | `qe/skills/` — 17 entries, each tied to a real incident; generates the audit checklist |
+| Probes | `qe/probe/` — runtime probes (fault injection, concurrency, three projections). Not guards: they need a running app |
+| Self-test | 80 good/bad fixture cases (`npm run qe:selftest`) |
 | Adapters | Prisma schema provider, TypeScript AST call collector |
 | Gates | `npm run qe` (guards + ratchet), `npm run qe:ci` (typecheck + self-test + guards + report) |
 | CLI | `npx autoqe init` scaffolds a project; `npx autoqe run --root .` audits it without copying any source |
@@ -165,9 +173,12 @@ RATCHET status=ok regressions=0 improvements=0 tracked=0
 ├── docs/zh-CN/                    # Full Chinese editions (archive)
 ├── AGENTS.md                      # Working protocol for coding agents
 ├── qe/
-│   ├── cli.ts                     # init / doctor / status / scan / run / explain / prompt / report / list / selftest / ratchet-update
-│   ├── guards/                    # One file per guard
-│   ├── lib/                       # Config, providers, AST utils, ratchet
+│   ├── cli.ts                     # init / doctor / status / scan / run / explain / prompt / report / list / skills / selftest / ratchet-update
+│   ├── guards/                    # One file per guard (schema/AST-based)
+│   ├── rules/                     # Pure-function judgments + inline counter-examples
+│   ├── skills/                    # Accident knowledge base (why each rule exists)
+│   ├── probe/                     # Runtime probes (not wired into `run` — they need a live app)
+│   ├── lib/                       # Config, providers, AST utils, ratchet, rule→guard adapter
 │   ├── registry/registry.ts       # Single source of truth for invariants
 │   ├── fixtures/                  # Good/bad samples per guard
 │   ├── demo/                      # Minimal integration example
@@ -190,6 +201,15 @@ RATCHET status=ok regressions=0 improvements=0 tracked=0
 | `inv20` | Server boundary | Entries without auth/validation/idempotency; public routes without reason | INV-WEB-01…04 |
 | `inv21` | Seam import | Client code reaching Prisma/Node, cross-module deep imports | INV-SEC-01, INV-SEAM-01 |
 | `inv22` | Zustand store | Sensitive fields persisted, missing `partialize`, missing `version` | INV-FE-01…02 |
+| `aq01` | Bare body parse | `request.json()` reaching business code without a 4xx cover | INV-WEB-05 |
+| `aq02` | Status literal | `status === 'X'` copies of a state machine (ratchet, `warn`) | INV-CORE-04 |
+| `aq03` | Swallowed error | Empty `catch`, or `catch` that only logs | INV-CORE-17 |
+| `aq04` | Check-then-act | read → null-check → create, when the table has no unique key | INV-CORE-12, INV-DB-01/02 |
+| `aq05` | Raw SQL scope | Hand-written SQL without a tenant predicate, or `Unsafe` with interpolation | INV-CORE-08 |
+| `aq06` | Route auth | Route handlers with no auth call (structural detection, not a name list) | INV-WEB-06 |
+| `aq07` | Fake green | Assertions that can never fail (7 shapes) | INV-CORE-18 |
+| `aq08` | IDOR | `findUnique({ where: { id } })` fed from the request, no ownership predicate | INV-SEC-03 |
+| `leak` | Project-info leak | Local absolute paths, credential shapes, project codewords | INV-META-01 |
 
 ## Configuration
 
@@ -286,14 +306,33 @@ npm run typecheck && npm run qe:selftest && npm run qe
 
 ## Data hygiene
 
-- No secrets, credentials, customer data, or internal business specifications belong in this repository.
-- Internal business specifications are excluded via `.gitignore` and are not part of the public package.
-- Reports in `qe-report/` and audit workspaces in `qe-audit/` are local artifacts and are ignored.
+No secrets, credentials, customer data, or internal business specifications belong in this repository.
+Internal business specifications are excluded via `.gitignore` and are not part of the public package.
+Reports in `qe-report/` and audit workspaces in `qe-audit/` are local artifacts and are ignored.
+
+This is enforced, not promised — `leak-project-info` (INV-META-01) fails the build on:
+
+- local absolute paths (`C://Users//…`, `/Users/…`) — they leak account names and directory layout;
+- credential shapes (API keys, tokens, private-key blocks, connection strings with a password);
+- project codewords listed in a **denylist that lives outside this repository**.
+
+The denylist is external by design: writing `forbidden: project-a` into the repo would register that
+name in plaintext. Point at it with an environment variable so the file never enters version control:
+
+```bash
+AUTOQE_DENYLIST=/path/to/leak-denylist.txt npx autoqe run --only leak --root .
+# one term per line; `term => replacement hint` is also accepted; `#` starts a comment
+```
+
+With no denylist configured the guard says so (`DENYLIST_EMPTY`, a warning) instead of reporting a
+comfortable zero: it verified the two structural classes, not the codewords.
 
 ## 中文说明
 
-AutoQe 是「不变量优先」的质量工程工具箱：把缺陷拦在设计层，而不是靠用例枚举。内置 27 条不变量、
-9 个静态守卫、19 个坏样本自证与只降不升的 ratchet 基线，并提供一套通用的项目体检与上线判定作业单。
+AutoQe 是「不变量优先」的质量工程工具箱：把缺陷拦在设计层，而不是靠用例枚举。内置 33 条不变量、
+18 个静态守卫（9 个 schema/AST 守卫 + 8 条规则 + 泄漏审计）、80 个坏样本自证与只降不升的 ratchet 基线，
+并提供一套通用的项目体检与上线判定作业单。规则层（`qe/rules/`）是纯函数，反证与判据写在同一个文件里；
+知识库（`qe/skills/`）记录每条规则是哪次真实事故泛化来的，`npx autoqe skills --checklist` 直接生成立项审计清单。
 它适合作为**外部体检清单**引入已有项目，**不替代**项目原有的守卫体系；内置 Prisma schema 与 TypeScript AST
 适配器，其他技术栈通过适配器接入。两种用法：`npx autoqe init` 后跑 `npx autoqe run --root .`；或把 `qe/`
 复制进项目后用 `npm run qe`。许可证：MIT。

@@ -10,6 +10,8 @@
   "files": [
     "dist",
     "qe/templates",
+    "qe/rules",
+    "qe/skills",
     "qe/registry",
     "QE-*.md",
     "AGENTS.md",
@@ -60,9 +62,19 @@
     "qe:guard:inv20": "node qe/cli.ts run --only inv20",
     "qe:guard:inv21": "node qe/cli.ts run --only inv21",
     "qe:guard:inv22": "node qe/cli.ts run --only inv22",
+    "qe:guard:aq01": "node qe/cli.ts run --only aq01",
+    "qe:guard:aq02": "node qe/cli.ts run --only aq02",
+    "qe:guard:aq03": "node qe/cli.ts run --only aq03",
+    "qe:guard:aq04": "node qe/cli.ts run --only aq04",
+    "qe:guard:aq05": "node qe/cli.ts run --only aq05",
+    "qe:guard:aq06": "node qe/cli.ts run --only aq06",
+    "qe:guard:aq07": "node qe/cli.ts run --only aq07",
+    "qe:guard:aq08": "node qe/cli.ts run --only aq08",
+    "qe:guard:leak": "node qe/cli.ts run --only leak",
+    "qe:skills": "node qe/cli.ts skills --check",
     "qe:ratchet": "node qe/cli.ts run",
     "qe:ratchet:update": "node qe/cli.ts ratchet-update",
-    "qe:ci": "npm run typecheck && npm run qe:selftest && npm run test:invariants && npm run test:triage && npm run qe:report"
+    "qe:ci": "npm run typecheck && npm run qe:selftest && npm run test:invariants && npm run qe:skills && npm run test:triage && npm run qe:report"
   },
   "dependencies": {
     "typescript": "5.9.3"
