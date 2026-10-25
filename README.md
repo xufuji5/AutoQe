@@ -45,6 +45,7 @@ This release turns several former "promises" into machine-checkable judgments:
 | **Skip codes enter the ratchet** | Narrowing a guard's scope now produces a `<guard>:SKIP:<code>` key. Previously, turning a whole class of subjects into "not applicable" made findings disappear with no regression signal |
 | **Index plane for leaks** | Data hygiene also scans `git ls-files`: a report, audit workspace, export, state identity, waiver, denylist or `.env` that reaches the **index** (e.g. after `git add -f`) fails with `TRACKED_STATE_FILE`, even when `.gitignore` hid it from the working tree |
 | **Self-test level caps** | Fixtures accept `maxErrors` / `maxWarnings` / `maxInfos`, so a "good" sample cannot pass while emitting an unexpected volume of findings at the wrong level |
+| **External state mode** | `run --root <other> --config <state>/qe.config.json` anchors identity, ratchet and reports at the config's directory (`stateRoot`), so auditing a project in another folder leaves both that repository and the engine directory untouched. The marker binds the state to the audited root; pointing it at a different root fails (`QE_ISOLATION_FOREIGN_ROOT`) |
 
 ## Cross-project isolation
 
@@ -59,6 +60,7 @@ silently follow the engine into B, so B's "0 errors" carries A's judgment. Isola
 | State stays in its root | Config-declared state and scan ranges (`contracts`, `waivers`, `ledger`, `auditDir`, `reportDir`, `source.roots`, `spec.docs`, `stores.moduleRoots`) may not escape `<root>` via `..`; an escape is a hard error |
 | State has an identity | `<stateRoot>/qe.project.json` identifies the state root. State without identity is refused, never auto-adopted. External state (`--config`) is bound to the audited root, so reusing it for another project fails |
 | Template copies are detected | The marker also binds `package.json`'s `name`; copying a whole repository as a template into a differently named project fails instead of inheriting A's config and baseline |
+| Auditing another folder leaves it untouched | External state (`--config <state>/qe.config.json`) puts `qe.project.json`, the ratchet baseline and reports beside that config, never in the audited repository and never in the engine directory. The marker binds the state to the audited root, so reusing it on a different root fails (`QE_ISOLATION_FOREIGN_ROOT`) |
 | Runtime is per-process | Rule self-test fixtures go to a per-process `mkdtemp` directory that is deleted on exit; nothing is written to the engine directory and no disk cache survives the process |
 | Cache is per-root | The AST cache is a table keyed by absolute root: scanning A and B in the same process cannot return B's file for A's query (and parallel scans cannot evict each other) |
 | Concurrency crosses processes | `autoqe multi --roots a,b` starts **one child process per project**, sets `cwd` to that project root, and strips every `AUTOQE_*` / `QE_*` environment variable by default (new project-scoped variables are covered without editing a list). Shared config, identity and report paths are process singletons, so in-process concurrency is not offered at all |
@@ -72,7 +74,15 @@ different project trees in one process (sequentially **and** in parallel via `Pr
 two CLI processes at once, and runs `multi` over both trees — asserting that A's denylist, AST cache,
 state and findings never reach B.
 
-> 中文摘要：引擎可以跨项目复用，但**项目数据绝不可以**。四条硬边界：内置引擎目录无状态；状态与扫描范围只能落在本项目根内（`..` 逃逸直接报错）；状态根有身份文件，外部状态绑定被审计项目，换项目复用直接拒绝；运行期产物落进程级临时目录，AST 缓存按 root 分表。同一个 WorkBuddy 同时处理多个项目时只走**进程边界**（`autoqe multi`：一项目一子进程、cwd 切到项目根、默认剥掉全部 `AUTOQE_*`/`QE_*` 环境变量），并且每个子进程必须自报 root 读数、输出里不得出现别的项目路径——隔离是**行为判据**，不是文档承诺。
+Exercised end to end on two independent project trees and one external production repository:
+
+| Claim | Evidence |
+|---|---|
+| A repository in another folder is analyzed without being cloned or modified | `run --root <other> --config <state>/qe.config.json --only inv13` read ~156 scripts / 219 script files and reported 68 `UNWIRED_SCRIPT` findings; the audited tree received no state, report or cache |
+| The audited project's data never enters the engine repository | After all scans, `git status` in the engine repo is empty and a full-tree search for the test markers returns 0; `qe.project.json` exists only under each project's `stateRoot`, with distinct ids |
+| Concurrent projects cannot read each other | `MULTI_RESULT roots=2 failed=0 status=green isolation=verified crossTalk=0 mismatched=0`; project A's reading is identical alone and inside `multi` (`errors=0 warnings=2 skipped=25`); `ISOLATION_SELFTEST cases=21 passed=21` |
+
+> 中文摘要：引擎可以跨项目复用，但**项目数据绝不可以**。四条硬边界：内置引擎目录无状态；状态与扫描范围只能落在本项目根内（`..` 逃逸直接报错）；状态根有身份文件，外部状态绑定被审计项目，换项目复用直接拒绝；运行期产物落进程级临时目录，AST 缓存按 root 分表。同一个 WorkBuddy 同时处理多个项目时只走**进程边界**（`autoqe multi`：一项目一子进程、cwd 切到项目根、默认剥掉全部 `AUTOQE_*`/`QE_*` 环境变量），并且每个子进程必须自报 root 读数、输出里不得出现别的项目路径——隔离是**行为判据**，不是文档承诺。仓外项目用 `--config` 审计时，身份、基线与报告锚在配置文件旁，被审计仓与引擎目录都零落地；实测并发读数 `isolation=verified crossTalk=0 mismatched=0`，单独跑与并发跑读数一致，隔离反证 21/21。
 
 ## Core ideas
 
@@ -212,7 +222,7 @@ see its subject says so and does **not** report "0 findings".
 | `npx autoqe triage --lang zh` | Human-facing output in Chinese for `triage`, `status` and `report`; `locale` in `qe.config.json` sets the default |
 | `npx autoqe waive CODE` | Add a waiver to `qe/waivers.json`; `--reason` and `--review-by YYYY-MM-DD` are required, `--scope` limits it to a path |
 | `npx autoqe scan` | Run all guards and write `qe-report/qe-report.md` in one shot |
-| `npx autoqe run --root .` | Run all guards against the target repository |
+| `npx autoqe run --root .` | Run all guards against the target repository. With `--config <file>`, identity, ratchet and reports stay beside that config, so a project in another folder can be audited without receiving any files |
 | `npx autoqe multi --roots a,b [--command run\|scan\|report\|triage\|status\|doctor]` | Scan/fix several projects at once: **one child process per project** (cwd = that project, every `AUTOQE_*` / `QE_*` env var stripped by default). Fails as a whole if any project fails **or if isolation cannot be proven** (child reports another root / output mentions another project's path). `--inherit-env` keeps the caller's environment as-is |
 | `npx autoqe explain INV-CORE-01` | Explain one invariant or guard (`inv28`, `qe:guard:inv28` also work); `--json` for machines |
 | `npx autoqe prompt audit\|fix\|review` | Print a paste-ready AI prompt with the current readings embedded |
@@ -548,6 +558,8 @@ AutoQe 是「不变量优先」的质量工程工具箱：把缺陷拦在设计�
 - **泄漏索引面**：除文件正文与提交信息外，还扫 `git ls-files`——`.gitignore` 只挡未跟踪文件，
   一次 `git add -f` 后数据文件进索引即红（`TRACKED_STATE_FILE`）。
 - **自测级别上限**：夹具支持 `maxErrors` / `maxWarnings` / `maxInfos`，坏样本不会因为「级别不对但数量多」混过去。
+- **外部状态模式**：`--config` 让身份、基线与报告落在配置文件旁（`stateRoot`），被审计仓与引擎目录都不落文件；
+  同一份状态换 root 复用直接拒绝（`QE_ISOLATION_FOREIGN_ROOT`）。
 
 数据与经验的边界固定为：报告、审计工作区、一次性导出、状态身份、豁免与黑名单是**数据**
 （忽略，且进索引即红）；`qe/rules/`、`qe/skills/`、`qe/ledger/incidents.json` 是**经验**（保留跟踪）。
