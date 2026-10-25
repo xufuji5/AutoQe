@@ -144,6 +144,32 @@ export const POLICIES: Record<string, Policy> = {
     ),
     action: L('Resolve the write data shape, then re-judge.', '把写点的 data 形态收敛后再判；在此之前按未知处理。'),
   },
+  RAW_WRITE_UNATTRIBUTED: {
+    disposition: 'record',
+    meaning: L(
+      'A raw SQL write ($executeRaw/$queryRaw) matches no model table/name in the schema, so which table it writes is unknown.',
+      '原生 SQL 写入（$executeRaw/$queryRaw）没有命中 schema 里的任何表名/模型名 → 写到哪张表未知。',
+    ),
+    action: L(
+      'Write to a declared table, or add the model to the schema; otherwise keep this as a candidate for manual review.',
+      '把 SQL 落到已声明的表，或在 schema 里补上该模型；否则保留为人工复核候选。',
+    ),
+  },
+  VALIDATE_NOT_PROVEN: {
+    disposition: 'decide',
+    meaning: L(
+      'The mutation entry reads the request body, but validation could not be proven: a same-file helper was called and no validation token was found (cross-file helpers are invisible).',
+      '变更入口读取了请求体，但校验没被证实：调了同文件 helper 却未见校验词（跨文件 helper 不可见）。',
+    ),
+    action: L(
+      'Validate inside the entry, or make the helper and its validation explicit.',
+      '在入口内做 schema 校验，或把 helper 的校验写明确。',
+    ),
+    options: [
+      L('A Validate inside the entry (recommended)', 'A 入口内校验（推荐）'),
+      L('B Make the helper validation explicit', 'B 把 helper 的校验写明确'),
+    ],
+  },
   CLIENT_TRANSITIVE_SERVER: {
     disposition: 'decide',
     meaning: L(
@@ -1318,6 +1344,8 @@ export const POLICY_META: Record<string, { impact: Impact; effort: Effort }> = {
   ZERO_WRITER: { impact: 'data', effort: 'M' },
   ZERO_WRITER_RENDERED: { impact: 'data', effort: 'M' },
   ZERO_WRITER_UNUSED: { impact: 'data', effort: 'S' },
+  RAW_WRITE_UNATTRIBUTED: { impact: 'data', effort: 'S' },
+  VALIDATE_NOT_PROVEN: { impact: 'data', effort: 'M' },
   MODEL_UNUSED: { impact: 'data', effort: 'M' },
   DEAD_ENUM: { impact: 'data', effort: 'M' },
   NO_WRITE_PATH: { impact: 'data', effort: 'M' },

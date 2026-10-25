@@ -93,33 +93,46 @@ Shape: `{ "model": "User", "field": "avatarUrl", "reason": "read by the marketin
 Use it only when a field is genuinely written or read outside the scanned tree. `reason` is mandatory;
 an empty reason is itself a finding. Exemptions are not a substitute for widening `source.roots`.
 
+Model-wide form: `{ "model": "Account", "field": "*", "reason": "written by @auth/prisma-adapter at runtime" }`.
+Reserve it for models whose writer lives inside a dependency (adapters, ORM hooks) where no `data` key is
+visible in your source; the reason must name the mechanism. `model: "*"` is accepted but should stay rare.
+
 ### `contracts` — promise and gate registry
 
-Path to a JSON file (default `qe.contracts.json`) created by `init` as
-`{ "promises": [], "gates": [] }`.
+Path to a JSON file created by `init` as `{ "promises": [], "gates": [], "errorCatalog": [] }`.
+**Default: unset (`""`).** Unset means "this repository has no registry": `inv06`, `inv07` and `inv26`
+report `skipped`, and `inv24` does not treat the path as an assertion target — it is not a defect.
+Declare the path only when you actually maintain the registry (e.g. `"contracts": "qe.contracts.json"`).
 
 - `promises[]` backs `inv06`: every "the system will do X" sentence in specs/comments must have a throw site
   or write site. Entry fields: `id`, `claim`, `source { file, contains }`, `backing { pattern, roots }`.
 - `gates[]` backs `inv07`: every server-side rejection rule needs a UI control, and every UI control needs a
   server-side rule.
+- `errorCatalog[]` backs `inv26`: error codes in use must have a throw site and vice versa.
 
-If the file is missing, `inv06`/`inv07` report errors, not green. Add one entry per promise; the sentence
-itself stays in your spec, the entry is the machine-readable pointer to it.
+When the path is declared but the file is missing, `inv06`/`inv07`/`inv26` still report `skipped`
+(`CONTRACTS_MISSING`) — and `inv24` reports `ASSERT_TARGET_MISSING`, because a declared path that does not
+exist means the criterion is judging a void.
 
 ### `boundaries` — Next.js server boundary vocabulary
 
 | Field | Default | Meaning |
 |---|---|---|
 | `authPatterns` | built-in list | Regex-ish tokens that count as an auth check (session lookup, `requireUser`, `auth()`, …) |
-| `validatePatterns` | built-in list | Tokens that count as input validation (`z.parse`, `schema.validate`, `safeParse`, …) |
-| `mutationMethods` | `POST`, `PUT`, `PATCH`, `DELETE` | HTTP methods that must carry an idempotency key |
+| `validatePatterns` | built-in list | Tokens that count as input validation (`z.object`, `.parse(`, `.safeParse(`, `validate(`, `parseBody`…). `JSON.parse(` is explicitly not a hit |
+| `mutationMethods` | `POST`, `PUT`, `PATCH`, `DELETE` | HTTP methods treated as mutations (auth + validation when the entry reads a request body) |
 | `publicRoutes` | `[]` | `{ "file": "app/api/health/route.ts", "reason": "liveness probe, read-only" }[]` |
 
-Backs `INV-WEB-01…04`. Two rules that are easy to get wrong:
+Backs `INV-WEB-01…04`. Three rules that are easy to get wrong:
 
 1. A `publicRoutes` entry with an empty `reason` is a finding, not a pass — "空理由等同未登记".
 2. `authPatterns` match tokens, not semantics. If your auth helper is named something unusual, add it here;
    otherwise a protected route looks unprotected.
+3. Validation is only required for entries that actually read a request body
+   (`request.json()` / `formData()` / `text()`); `DELETE` and action-style `POST` without a body have no input
+   to validate. A same-file helper called from the entry can prove validation (one hop); cross-file helpers
+   downgrade the finding to `VALIDATE_NOT_PROVEN` (warn). Idempotency keys are required for `POST`/`PUT`/`PATCH`
+   only — `DELETE` is idempotent by definition.
 
 ### `stores` — client state boundaries
 

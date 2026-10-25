@@ -148,6 +148,13 @@ export interface QeConfig {
   systemFields: Record<string, string>
   /** 逐字段豁免：理由必填，禁止空理由 */
   fieldExemptions: { model: string; field: string; reason: string }[]
+  /**
+   * 契约台账路径。默认空串＝未配置：inv06/inv07/inv26 显式 skipped，inv24 不把它当断言对象。
+   *
+   * 以前默认是 `qe.contracts.json`，于是任何没跑过 `init` 的仓 / 外部 `--config` 审计都会
+   * 被判「断言对象不存在」——那不是缺陷，是引擎自己假设了一份台账。
+   * `autoqe init` 会显式写入 `qe.contracts.json`；项目要判承诺/闸/错误码时自己声明。
+   */
   contracts: string
   scriptsDirs: string[]
   /**
@@ -297,7 +304,7 @@ export const defaultConfig: QeConfig = {
     deletedAt: '软删助手统一写入',
   },
   fieldExemptions: [],
-  contracts: 'qe.contracts.json',
+  contracts: '',
   scriptsDirs: ['scripts'],
   addressableLibDirs: [],
   addressableOrchestratorExts: ['.sh'],

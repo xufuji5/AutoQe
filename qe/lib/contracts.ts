@@ -24,6 +24,9 @@ export interface Contracts {
 }
 
 export async function loadContracts(root: string, config: QeConfig): Promise<Contracts | null> {
+  // 空串＝未配置（不是「配置了一个叫空串的路径」）。不早退会让 path.join(root, '') 指向根目录，
+  // 读目录失败后又恰好落进「台账不存在」分支，掩盖真正的配置空档。
+  if (!config.contracts.trim()) return null
   const text = await readTextSafe(path.join(root, config.contracts))
   if (text === null) return null
   const parsed = JSON.parse(text) as Partial<Contracts>

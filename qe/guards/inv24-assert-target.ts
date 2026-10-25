@@ -166,6 +166,18 @@ export const inv24 = defineGuard({
       },
     },
     {
+      // 旧默认值把 contracts 预置成 qe.contracts.json：没跑过 init 的仓 / 外部 --config 审计
+      // 都会多一条 ASSERT_TARGET_MISSING。未配置就是「没有这份台账」，不是「台账缺失」。
+      name: 'good：contracts 未配置（空串）不参与断言对象，旧默认值会制造假红',
+      root: REPO_ROOT,
+      expect: 'green',
+      config: {
+        schema: { provider: 'prisma', path: 'qe/demo/prisma/schema.prisma', clientNames: [] },
+        source: { collector: 'ts', roots: ['qe/demo/src'], extensions: [] },
+        contracts: '',
+      },
+    },
+    {
       name: 'bad：schema.path 指向不存在的路径（判据空转）',
       root: path.join(FIXTURES, 'bad-missing'),
       expect: 'red',
@@ -173,7 +185,7 @@ export const inv24 = defineGuard({
       config: {
         schema: { provider: 'prisma', path: 'no/such/schema.prisma', clientNames: [] },
         source: { collector: 'none', roots: [], extensions: [] },
-        contracts: 'qe.contracts.json',
+        contracts: '',
       },
     },
     {
@@ -185,7 +197,7 @@ export const inv24 = defineGuard({
       config: {
         schema: { provider: 'prisma', path: 'ignored-target/schema.prisma', clientNames: [] },
         source: { collector: 'none', roots: [], extensions: [] },
-        contracts: 'qe.contracts.json',
+        contracts: '',
       },
     },
     {

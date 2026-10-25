@@ -58,7 +58,8 @@ export const inv07 = defineGuard({
     }
   },
   selfTest: [
-    { name: 'good：两道闸的判据与控件齐全', root: path.join(FIXTURES, 'good'), expect: 'green' },
-    { name: 'bad：一闸无控件、一闸无判据', root: path.join(FIXTURES, 'bad'), expect: 'red', minErrors: 2 },
+    // 契约台账默认未配置（空串）：用例必须显式声明自己的台账，否则本判据按设计 skipped。
+    { name: 'good：两道闸的判据与控件齐全', root: path.join(FIXTURES, 'good'), expect: 'green', config: { contracts: 'qe.contracts.json' } },
+    { name: 'bad：一闸无控件、一闸无判据', root: path.join(FIXTURES, 'bad'), expect: 'red', minErrors: 2, config: { contracts: 'qe.contracts.json' } },
   ],
 })

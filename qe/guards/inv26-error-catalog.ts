@@ -139,6 +139,7 @@ export const inv26 = defineGuard({
       expect: 'green',
       config: {
         source: { collector: 'ts', roots: ['src'], extensions: [] },
+        contracts: 'qe.contracts.json',
         errors: { throwPattern: "ApiError\\('([A-Z_]+)'" },
       } as ConfigPatch,
     },
@@ -150,6 +151,7 @@ export const inv26 = defineGuard({
       maxErrors: 1,
       config: {
         source: { collector: 'ts', roots: ['src'], extensions: [] },
+        contracts: 'qe.contracts.json',
       } as ConfigPatch,
     },
     {
@@ -160,6 +162,7 @@ export const inv26 = defineGuard({
       maxErrors: 1,
       config: {
         source: { collector: 'ts', roots: ['src'], extensions: [] },
+        contracts: 'qe.contracts.json',
         errors: { throwPattern: "ApiError\\('([A-Z_]+)'" },
       } as ConfigPatch,
     },
@@ -171,6 +174,7 @@ export const inv26 = defineGuard({
       maxWarnings: 1,
       config: {
         source: { collector: 'ts', roots: ['src'], extensions: [] },
+        contracts: 'qe.contracts.json',
       } as ConfigPatch,
     },
   ],

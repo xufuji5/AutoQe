@@ -68,7 +68,8 @@ export const inv06 = defineGuard({
     }
   },
   selfTest: [
-    { name: 'good：承诺句与抛错点一一对应', root: path.join(FIXTURES, 'good'), expect: 'green' },
-    { name: 'bad：册面有承诺、源码无背书', root: path.join(FIXTURES, 'bad'), expect: 'red', minErrors: 1 },
+    // 契约台账默认未配置（空串）：用例必须显式声明自己的台账，否则本判据按设计 skipped。
+    { name: 'good：承诺句与抛错点一一对应', root: path.join(FIXTURES, 'good'), expect: 'green', config: { contracts: 'qe.contracts.json' } },
+    { name: 'bad：册面有承诺、源码无背书', root: path.join(FIXTURES, 'bad'), expect: 'red', minErrors: 1, config: { contracts: 'qe.contracts.json' } },
   ],
 })

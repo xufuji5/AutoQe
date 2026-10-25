@@ -36,7 +36,9 @@ export const inv01 = defineGuard({
   title: '零写入列（活表死列）',
   invariants: ['INV-CORE-01'],
   blindSpots: [
-    '只统计 Prisma Client 的 create/createMany/update/upsert 的 data 键；$executeRaw 等原生 SQL 写入不可见',
+    'Prisma Client 的 create/update 键认全；$executeRaw/$queryRaw 只按「DML + 表名」归属到模型并降级为「写入覆盖未知」，列级写入仍不可见',
+    '归属不到模型的原生 SQL 写点只出 RAW_WRITE_UNATTRIBUTED 候选（warn），不判死列；候选只报应用面，evidenceRoots 的造数脚本不出候选',
+    '依赖内部（PrismaAdapter 等）在运行期写入的模型，需用 fieldExemptions 的 field="*" 声明（理由必填）',
     '有 @default / @updatedAt 的列不判零写入（DB 侧有值来源）；默认值导致状态永不推进属 inv03 射程',
     '嵌套写（items: { create: [...] }）、DB 触发器不算业务写点',
     '同名但不同 model 的字段按 model 维度隔离，不做类型推理',
@@ -124,8 +126,20 @@ export const inv01 = defineGuard({
       findings.push(
         warn(
           'WRITE_COVERAGE_UNKNOWN',
-          `${model} 有 ${count} 个标量字段的写入经变量/函数参数/展开传入，静态无法确认：按覆盖未知处理（需人工复核，不判死列）`,
+          `${model} 有 ${count} 个标量字段的写入经变量/函数参数/展开/原生 SQL 传入，静态无法确认：按覆盖未知处理（需人工复核，不判死列）`,
           { entity: model, file: ctx.config.schema.path },
+        ),
+      )
+    }
+    // 原生 SQL 写点归属不到模型时只剩候选：没有表名就无法判断哪张表的哪一列，
+    // 判死列会逼人删掉真实写入链路。evidenceRoots（测试/运维脚本）的写点是造数动作，
+    // 不参与产品写入面候选（可归属的写点仍计入覆盖未知，见 columns.ts）。
+    for (const raw of scan.rawWrites.filter((r) => r.models.length === 0 && !r.evidence)) {
+      findings.push(
+        warn(
+          'RAW_WRITE_UNATTRIBUTED',
+          `${raw.file}:${raw.line} 原生 SQL 写入（${raw.snippet}）无法归属到 schema 里的模型：写入覆盖未知，需人工复核`,
+          { file: raw.file, line: raw.line },
         ),
       )
     }
@@ -220,6 +234,47 @@ export const inv01 = defineGuard({
       config: {
         schema: { provider: 'prisma', path: 'schema.prisma', clientNames: ['prisma', 'db', 'tx'] },
         source: { collector: 'ts', roots: ['src'], extensions: [] },
+      },
+    },
+    {
+      name: 'warn：原生 SQL 写入按表名归属到模型，降级为覆盖未知（旧判据判死列）',
+      root: path.join(FIXTURES, 'raw-sql-write'),
+      expect: 'warn',
+      minWarnings: 1,
+      maxErrors: 0,
+      config: {
+        schema: { provider: 'prisma', path: 'schema.prisma', clientNames: ['prisma', 'db', 'tx'] },
+        source: { collector: 'ts', roots: ['src'], extensions: [] },
+      },
+    },
+    {
+      name: 'good：注释/字符串素材/只读 queryRaw 里的原生写字样不算写点（旧判据按窗口取词会出假候选）',
+      root: path.join(FIXTURES, 'raw-sql-noise'),
+      expect: 'green',
+      config: {
+        schema: { provider: 'prisma', path: 'schema.prisma', clientNames: ['prisma', 'db', 'tx'] },
+        source: { collector: 'ts', roots: ['src'], extensions: [] },
+      },
+    },
+    {
+      name: 'good：evidenceRoots 里的动态表名造数写点不出「应用面写入覆盖未知」候选（旧判据逐脚本刷 warn）',
+      root: path.join(FIXTURES, 'evidence-raw-noise'),
+      expect: 'green',
+      config: {
+        schema: { provider: 'prisma', path: 'schema.prisma', clientNames: ['prisma', 'db', 'tx'] },
+        source: { collector: 'ts', roots: ['src'], evidenceRoots: ['scripts'], extensions: [] },
+      },
+    },
+    {
+      name: 'good：适配器模型用 field="*" 模型级豁免（理由必填），旧判据会整表判死列',
+      root: path.join(FIXTURES, 'adapter-model'),
+      expect: 'green',
+      config: {
+        schema: { provider: 'prisma', path: 'schema.prisma', clientNames: ['prisma', 'db', 'tx'] },
+        source: { collector: 'ts', roots: ['src'], extensions: [] },
+        fieldExemptions: [
+          { model: 'Account', field: '*', reason: '由 @auth/prisma-adapter 在运行期写入，源码内无 data 键' },
+        ],
       },
     },
   ],

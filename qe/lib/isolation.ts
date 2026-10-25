@@ -159,7 +159,7 @@ export function hasProjectState(iso: IsolationState, config?: QeConfig): boolean
     if (dir && existsSync(path.resolve(iso.root, dir))) return true
     if (dir && existsSync(path.resolve(iso.stateRoot, dir))) return true
   }
-  if (config && existsSync(path.resolve(iso.root, config.contracts))) return true
+  if (config?.contracts.trim() && existsSync(path.resolve(iso.root, config.contracts))) return true
   if (config && existsSync(path.resolve(iso.root, config.waivers))) return true
   return false
 }
