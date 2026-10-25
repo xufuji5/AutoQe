@@ -1,0 +1,32 @@
+{
+  "$comment": "小程序工程预设（不针对任何具体项目）：把 roots 指向你的小程序源码目录，扩展名只放 js/ts —— .wxml/.wxss 由判据按需从磁盘读，不作为扫描面，避免其它规则把模板当脚本解析",
+  "schema": {
+    "provider": "none",
+    "path": "__no_schema__.prisma",
+    "clientNames": []
+  },
+  "source": {
+    "collector": "none",
+    "roots": ["miniprogram"],
+    "extensions": [".js", ".ts"]
+  },
+  "ignore": [
+    "node_modules",
+    "miniprogram_npm",
+    "dist",
+    "build",
+    "coverage",
+    ".git",
+    "qe/fixtures",
+    "qe-report",
+    "qe-audit"
+  ],
+  "metaGuards": false,
+  "rules": {
+    "mp01": { "mpRoots": ["miniprogram", ""] },
+    "mp02": { "mpRoots": ["miniprogram", ""] },
+    "mp03": { "mpRoots": ["miniprogram", ""] },
+    "mp04": { "mpRoots": ["miniprogram", ""] },
+    "mp05": { "mpRoots": ["miniprogram", ""] }
+  }
+}

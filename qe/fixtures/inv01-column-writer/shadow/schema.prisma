@@ -1,0 +1,5 @@
+model Profile {
+  id        String @id @default(cuid())
+  phone     String
+  adminName String
+}

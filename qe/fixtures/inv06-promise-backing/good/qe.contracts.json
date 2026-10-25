@@ -1,0 +1,17 @@
+{
+  "promises": [
+    {
+      "id": "PR-01",
+      "claim": "未通过审核报告闸门的记录不可发布",
+      "source": {
+        "file": "docs/rules.md",
+        "contains": "未通过审核报告闸门的记录不可发布"
+      },
+      "backing": {
+        "roots": ["src"],
+        "pattern": "APPROVAL_REPORT_REQUIRED"
+      }
+    }
+  ],
+  "gates": []
+}

@@ -1,0 +1,48 @@
+name: qe
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # qe.project.json 是本机状态身份（已 gitignore，绝不入库）。CI 里先显式绑定，
+      # 否则「已有账本（ratchet/contracts）但没有身份」会被 QE_ISOLATION_UNBOUND 拒绝——这是设计，不是故障。
+      - name: Bind state identity
+        run: node qe/cli.ts init
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Invariant guards (exit code is the verdict)
+        run: npm run test:invariants
+      - name: Knowledge base shape (no rule without a recorded incident)
+        run: npm run qe:skills
+      - name: Project-info leak audit (local paths, credential shapes)
+        run: npm run qe:guard:leak
+      - name: Cross-project isolation counter-proofs (two project trees, one process)
+        run: npm run test:isolation
+      - name: Health metrics report (also runs the bad-sample counter-proof and prints SELFTEST_RESULT)
+        run: npm run qe:report
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qe-report
+          path: qe-report/
+          if-no-files-found: ignore

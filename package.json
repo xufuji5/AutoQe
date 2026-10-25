@@ -1,0 +1,119 @@
+{
+  "name": "autoqe",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AutoQe — Quality Engineering toolkit for AI-assisted development: invariant registry, static guards, bad-sample self-tests and a ratchet baseline.",
+  "license": "MIT",
+  "bin": {
+    "autoqe": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "qe/templates",
+    "qe/rules",
+    "qe/skills",
+    "qe/registry",
+    "qe.config.miniprogram.json",
+    "QE-*.md",
+    "AGENTS.md",
+    "tsconfig.qe.json",
+    "docs/ai-agent-workflow.md",
+    "docs/configuration.md"
+  ],
+  "keywords": [
+    "quality-engineering",
+    "static-analysis",
+    "invariants",
+    "ai-coding",
+    "prisma",
+    "nextjs",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xufuji5/AutoQe.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xufuji5/AutoQe/issues"
+  },
+  "homepage": "https://github.com/xufuji5/AutoQe#readme",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
+    "prepack": "npm run build",
+    "typecheck": "tsc -p tsconfig.qe.json",
+    "qe": "node qe/cli.ts run",
+    "qe:init": "node qe/cli.ts init",
+    "qe:list": "node qe/cli.ts list",
+    "qe:status": "node qe/cli.ts status",
+    "qe:triage": "node qe/cli.ts triage",
+    "qe:selftest": "node qe/cli.ts selftest",
+    "qe:report": "node qe/cli.ts report",
+    "test:invariants": "node qe/cli.ts run",
+    "test:triage": "node scripts/verify-triage.ts",
+    "test:isolation": "node scripts/verify-isolation.ts",
+    "test:spec": "node scripts/verify-spec-tables.ts",
+    "test:oracle": "node scripts/verify-rule-oracles.ts",
+    "test:invariants-selftest": "node qe/cli.ts selftest",
+    "qe:guard:inv01": "node qe/cli.ts run --only inv01",
+    "qe:guard:inv02": "node qe/cli.ts run --only inv02",
+    "qe:guard:inv03": "node qe/cli.ts run --only inv03",
+    "qe:guard:inv06": "node qe/cli.ts run --only inv06",
+    "qe:guard:inv07": "node qe/cli.ts run --only inv07",
+    "qe:guard:inv13": "node qe/cli.ts run --only inv13",
+    "qe:guard:inv20": "node qe/cli.ts run --only inv20",
+    "qe:guard:inv21": "node qe/cli.ts run --only inv21",
+    "qe:guard:inv22": "node qe/cli.ts run --only inv22",
+    "qe:guard:inv23": "node qe/cli.ts run --only inv23",
+    "qe:guard:inv24": "node qe/cli.ts run --only inv24",
+    "qe:guard:inv25": "node qe/cli.ts run --only inv25",
+    "qe:guard:inv26": "node qe/cli.ts run --only inv26",
+    "qe:guard:inv27": "node qe/cli.ts run --only inv27",
+    "qe:guard:inv28": "node qe/cli.ts run --only inv28",
+    "qe:guard:aq01": "node qe/cli.ts run --only aq01",
+    "qe:guard:aq02": "node qe/cli.ts run --only aq02",
+    "qe:guard:aq03": "node qe/cli.ts run --only aq03",
+    "qe:guard:aq04": "node qe/cli.ts run --only aq04",
+    "qe:guard:aq05": "node qe/cli.ts run --only aq05",
+    "qe:guard:aq06": "node qe/cli.ts run --only aq06",
+    "qe:guard:aq07": "node qe/cli.ts run --only aq07",
+    "qe:guard:aq08": "node qe/cli.ts run --only aq08",
+    "qe:guard:aq09": "node qe/cli.ts run --only aq09",
+    "qe:guard:aq10": "node qe/cli.ts run --only aq10",
+    "qe:guard:aq11": "node qe/cli.ts run --only aq11",
+    "qe:guard:aq12": "node qe/cli.ts run --only aq12",
+    "qe:guard:aq13": "node qe/cli.ts run --only aq13",
+    "qe:guard:aq14": "node qe/cli.ts run --only aq14",
+    "qe:guard:oracle": "node scripts/verify-rule-oracles.ts",
+    "qe:guard:spec": "node qe/cli.ts run --only spec-abs",
+    "qe:guard:waivers": "node scripts/verify-triage.ts",
+    "qe:guard:mp01": "node qe/cli.ts run --only mp01",
+    "qe:guard:mp02": "node qe/cli.ts run --only mp02",
+    "qe:guard:mp03": "node qe/cli.ts run --only mp03",
+    "qe:guard:mp04": "node qe/cli.ts run --only mp04",
+    "qe:guard:mp05": "node qe/cli.ts run --only mp05",
+    "qe:guard:mp06": "node qe/cli.ts run --only mp06",
+    "qe:guard:mp07": "node qe/cli.ts run --only mp07",
+    "qe:guard:mp08": "node qe/cli.ts run --only mp08",
+    "qe:guard:leak": "node qe/cli.ts run --only leak",
+    "qe:guard:iso01": "node qe/cli.ts run --only iso01",
+    "qe:guard:isolation": "node scripts/verify-isolation.ts",
+    "qe:skills": "node qe/cli.ts skills --check",
+    "qe:ratchet": "node qe/cli.ts run",
+    "qe:ratchet:update": "node qe/cli.ts ratchet-update",
+    "qe:ci": "npm run typecheck && npm run test:invariants && npm run qe:skills && npm run test:triage && npm run test:isolation && npm run test:spec && npm run test:oracle && npm run qe:report"
+  },
+  "dependencies": {
+    "typescript": "5.9.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.0"
+  },
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "author": ""
+}

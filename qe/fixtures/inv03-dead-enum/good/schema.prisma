@@ -1,0 +1,10 @@
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+}
+
+model Request {
+  id     String        @id @default(cuid())
+  status RequestStatus @default(DRAFT)
+}

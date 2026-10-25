@@ -1,0 +1,19 @@
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  CLOSED
+}
+
+model Request {
+  id         String        @id @default(cuid())
+  tenantId   String
+  status     RequestStatus @default(DRAFT)
+  amountCents Int
+  note       String?
+  archivedAt DateTime?     /// @archive 仅审计导出读取
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@map("requests")
+}

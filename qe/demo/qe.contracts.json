@@ -1,0 +1,24 @@
+{
+  "promises": [
+    {
+      "id": "PR-01",
+      "claim": "未通过审核报告闸门的记录不可发布",
+      "source": {
+        "file": "qe/demo/docs/rules.md",
+        "contains": "未通过审核报告闸门的记录不可发布"
+      },
+      "backing": {
+        "roots": ["qe/demo/src"],
+        "pattern": "APPROVAL_REPORT_REQUIRED"
+      }
+    }
+  ],
+  "gates": [
+    {
+      "id": "GATE-APPROVAL",
+      "reject": "缺少审核报告不可发布",
+      "server": { "roots": ["qe/demo/src"], "pattern": "APPROVAL_REPORT_REQUIRED" },
+      "control": { "roots": ["qe/demo/src"], "pattern": "approvalReportUrl" }
+    }
+  ]
+}

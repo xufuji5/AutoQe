@@ -1,0 +1,8 @@
+enum VerifyState {
+  PENDING
+}
+
+model Cert {
+  id    String      @id @default(cuid())
+  state VerifyState @default(PENDING)
+}

@@ -1,0 +1,7 @@
+{
+  "name": "fixture-orch",
+  "private": true,
+  "scripts": {
+    "qe:ok": "node scripts/tool.ts"
+  }
+}

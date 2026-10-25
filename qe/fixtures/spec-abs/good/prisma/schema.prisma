@@ -1,0 +1,5 @@
+model Asset {
+  id        Int    @id @default(autoincrement())
+  number    String @unique
+  createdAt DateTime @default(now())
+}

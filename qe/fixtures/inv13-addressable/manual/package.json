@@ -1,0 +1,7 @@
+{
+  "name": "fixture-manual",
+  "private": true,
+  "scripts": {
+    "qe:ok": "tsx scripts/tool.ts"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.qe.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "qe",
+    "rewriteRelativeImportExtensions": true,
+    "sourceMap": false,
+    "declaration": false
+  },
+  "include": ["qe/cli.ts", "qe/lib/**/*.ts", "qe/guards/**/*.ts", "qe/registry/**/*.ts"],
+  "exclude": ["qe/fixtures/**", "qe/demo/**"]
+}

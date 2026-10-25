@@ -1,0 +1,9 @@
+enum HazardClass {
+  banned_chem
+  low_risk
+}
+
+model Chemical {
+  id    String      @id @default(cuid())
+  level HazardClass @default(low_risk)
+}

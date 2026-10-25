@@ -1,0 +1,110 @@
+[
+  {
+    "id": "C-001",
+    "title": "schema 中存在一个零写入者的业务列",
+    "inv": "INV-CORE-01",
+    "date": "2026-09-12"
+  },
+  {
+    "id": "C-002",
+    "title": "某个状态值只出现在读侧，没有任何产生路径",
+    "inv": "INV-CORE-03",
+    "date": "2026-09-28"
+  },
+  {
+    "id": "C-003",
+    "title": "闸门只写在规范里，服务端零抛错点",
+    "inv": "INV-CORE-06",
+    "date": "2026-10-08"
+  },
+  {
+    "id": "C-004",
+    "title": "新增缺陷：租户隔离在某张豁免表上缺失",
+    "inv": "",
+    "date": "2026-10-20"
+  },
+  {
+    "id": "C-005",
+    "title": "构造函数被高阶守卫包裹后整文件不再被分析：同一处异步写视图，注册形式从 Page({ 改成 Page(guardPage({ 就让读数从 1 warning 变 green（「看不见」与「没问题」在报告上长得一样）",
+    "inv": "INV-MP-07",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-006",
+    "title": "端侧把服务端配置表逐字镜像一份（FEED_TABS 镜像 lib/config/copywriting.ts，逐项比对在 test:mp:index-feed）被判成写死数据源：单源在另一个进程的常量，静态不可知，只能靠声明豁免",
+    "inv": "INV-RES-02",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-007",
+    "title": "唯一冲突兜底写在事务回调内：输家被唯一索引挡住后回读赢家行，而 PG 已把事务置为 aborted ⇒ 回读必抛 25P02，兜底保证失败（调用方是网关回调时＝重试死循环）",
+    "inv": "INV-DB-04",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-008",
+    "title": "修复批次自建判据 17/17 全绿即宣布清零，外部规则集复扫仍撞出 1 条真缺陷 + 3 条判据自身缺陷（后三条全在夹具里：写死依赖目录取 CLI）——「已解决」若由修的人宣布，只是主张",
+    "inv": "",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-009",
+    "title": "ratchet-update 不校验覆盖：run --only X 之后照写基线，未跑守卫的债一次性抹成 0，且打印漂亮的 keys=N（已修：缺覆盖即 RATCHET_REFUSE，要抹掉历史须显式 --force）",
+    "inv": "INV-CORE-16",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-010",
+    "title": "inv13 把两件事并成一条判据：registry 面（别名/复审）只在「本仓自带引擎 registry」时成立，addressable 面任何仓都成立。合并的后果＝审外部仓时 47 条 ALIAS_MISSING 全是类别错误，为压它们只能把整条守卫降级成 warn，连带放过真的 SCRIPT_TARGET_MISSING",
+    "inv": "INV-CORE-13",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-011",
+    "title": "「有入口」的射程远不止 package.json：库目录/编排层 .sh/被 import/join() 拼给子进程/runner 发现制 五种形态全漏时，136 条读数里 112 条是假阳性 —— 假阳性占九成时真孤儿已被淹没（另：扫未跟踪文件让基线在干净 clone 上不可复现）",
+    "inv": "INV-CORE-13",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-012",
+    "title": "跳过是单向旋钮：判据每关掉一类「不适用」，findings 少一批、读数只会更好看；而 RATCHET 只跟踪 findings 不跟踪 skip，于是「射程缩水」在棘轮上完全隐形（某试点仓实测：skipped=6 只以一个数字出现，没人能回答那 6 个是什么、上次是 2 还是 8）。修＝NotApplicable 强制 (code,reason)、skip 键进棘轮、QE_RESULT 按 code 列出",
+    "inv": "INV-CORE-16",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-013",
+    "title": "「无入口的脚本」有第 6 种真实形态：人工按需执行（取证工具/反证发生器/一次性作业）。只当白名单会退化成豁免槽（谁都能加一条 glob 让孤儿消失）；正确形态是「运行路径声明」——howToRun 前缀必须能与每个命中文件拼出文件里真实写着的那条命令，否则仍判 NO_RUNBOOK",
+    "inv": "INV-CORE-13",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-014",
+    "title": "同一前提关掉的判据必须共享同一个 skip code：8 个 mp 规则都因为「这不是小程序工程」空转，裸字符串让它们在棘轮里各记一条 AQ_NOT_CLASSIFIED，读起来像八件不同的事各关了一类射程（事实是一件事关掉了八条判据）。修＝共享前置返回值带 code + 兜底 AQ_NOT_CLASSIFIED 集中出现本身即待办信号",
+    "inv": "INV-CORE-16",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-015",
+    "title": "引擎整条 CLI 依赖顶层 import typescript：三个模块静态 import 裸包名，目标仓没装（或 npx 场景）时不是「跳过相关守卫」而是全部命令起不来——一个可选能力的缺失拖垮整条流水线，且报错是 ERR_MODULE_NOT_FOUND 指向 guard 文件，看起来像装包问题不像设计问题",
+    "inv": "INV-CORE-13",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-016",
+    "title": "「零引用」被当成「死代码」：判据只查了 import 图与 package.json，漏掉两种真实入口 —— ①被另一脚本在运行期提示（错误信息直接叫用户去跑它）点名 ②有下游在读它的产物（4.9MB 部署物料只有一个生成器）。误判的代价不是多留一个文件，而是**删掉能力**：季度合规 SOP 失去唯一执行工具、部署链断在导出环节。这不是把入口射程补宽能解决的（「提及≠会跑」在本仓已栽过），正确形态是把它们登记成人工类并逐文件校验运行命令。教训：判死代码前必须问「删掉之后哪个流程会断」，而不是「有没有人 import 它」",
+    "inv": "INV-CORE-13",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-017",
+    "title": "棘轮基线写进了被审计仓，而引擎早就声明了「状态跟着配置走」：`isolation.ts` 定义 stateRoot = dirname(configFile) 且 KNOWN_STATE 明确列了 `qe/ratchet.json`，但 stateRoot 的唯一消费者是 doctor 的一行打印 —— 没有任何代码把它接线到写盘位置，ratchet/waivers/ledger 全部是 `path.join(root, ...)`。可观测后果三条：①被审计仓的 .gitignore 必须为它开例外才活得过一次 git clean（本会话内目录被整体删除两次）；②这条例外又让人误以为基线是本仓资产，于是有人据此把「基线必须入库」当成正确结论；③ratchet 绕过身份校验（assertIsolation 只管 config 不放行，写盘另走 root），状态根绑定 A 项目时仍可往 B 项目写基线。正确修法＝接线 stateRoot（见 C-018），不是给 ignore 开例外",
+    "inv": "INV-CORE-16",
+    "date": "2026-10-25"
+  },
+  {
+    "id": "C-018",
+    "title": "「声明了机制」被当成「机制生效了」：stateRoot 在 isolation.ts 里定义完整（外部配置模式＝配置所在目录）、KNOWN_STATE 清单也列了三个状态载体，但消费者只有一行 doctor 打印；ratchet/waivers/ledger 全部仍写 `path.join(root, ...)`。这类缺陷的识别标志是「注释里写着的设计」与「代码里实际传的参数」不一致，而两者都在同一个仓里、读起来都像对的。修法三条：①ratchet 三个函数的路径参数一律改名 stateRoot（名字是最便宜的判据，叫 root 时每个调用方都会传 root）；②cli 三处调用走 requireIsolation(config).stateRoot（顺带让写盘前必须过身份绑定）；③真机三向验证：引擎仓 project 模式 ok / 试点仓外部模式基线落到工具侧且本仓零残留 / 另一试点仓复用同一状态根被 QE_ISOLATION_FOREIGN_ROOT 拒绝",
+    "inv": "INV-CORE-16",
+    "date": "2026-10-25"
+  }
+]

@@ -1,0 +1,4 @@
+{
+  "source": { "roots": ["src"] },
+  "rules": { "aq01": { "reviewed": true } }
+}

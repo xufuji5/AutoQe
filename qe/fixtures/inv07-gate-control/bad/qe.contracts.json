@@ -1,0 +1,17 @@
+{
+  "promises": [],
+  "gates": [
+    {
+      "id": "GATE-APPROVAL",
+      "reject": "缺少审核报告不可发布",
+      "server": { "roots": ["src"], "pattern": "APPROVAL_REPORT_REQUIRED" },
+      "control": { "roots": ["src"], "pattern": "approvalReportUrl" }
+    },
+    {
+      "id": "GATE-QUOTA",
+      "reject": "配额不足不可提交",
+      "server": { "roots": ["src"], "pattern": "QUOTA_INSUFFICIENT" },
+      "control": { "roots": ["src"], "pattern": "quotaQty" }
+    }
+  ]
+}

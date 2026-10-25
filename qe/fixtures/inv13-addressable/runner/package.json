@@ -1,0 +1,9 @@
+{
+  "name": "fixture-runner",
+  "private": true,
+  "scripts": {
+    "qe:ok": "node node_modules/tsx/dist/cli.mjs scripts/ok.ts",
+    "qe:mts": "node node_modules/tsx/dist/cli.mjs --no-warnings scripts/tool.mts",
+    "qe:glob": "node node_modules/tsx/dist/cli.mjs --test scripts/*.spec.ts"
+  }
+}

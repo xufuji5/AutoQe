@@ -1,0 +1,7 @@
+{
+  "name": "fixture-good",
+  "private": true,
+  "scripts": {
+    "qe:ok": "node scripts/ok.ts"
+  }
+}

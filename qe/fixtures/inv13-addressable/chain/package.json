@@ -1,0 +1,7 @@
+{
+  "name": "fixture-chain",
+  "private": true,
+  "scripts": {
+    "qe:ok": "tsx scripts/runner.ts"
+  }
+}

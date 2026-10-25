@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-25T05:52:51.122Z",
+  "counts": {
+    "inv23-entry-channel:SKIP:NO_ROUTE_FILES": 1,
+    "inv25-soft-delete-read:SKIP:SOFTDELETE_UNDECLARED": 1,
+    "inv26-error-catalog:NO_CATALOG": 1,
+    "inv27-clean-checkout:SKIP:BUILD_UNDECLARED": 1,
+    "inv28-rate-limit:SKIP:RATELIMIT_UNDECLARED": 1,
+    "spec-abs:SKIP:SPEC_DOCS_UNSET": 1,
+    "leak-project-info:DENYLIST_EMPTY": 1,
+    "iso01-vendored-engine:SKIP:NO_VENDORED_ENGINE": 1,
+    "aq09:SKIP:UNIQUE_WRITES_UNSET": 1,
+    "mp01:SKIP:MP_PROJECT_NOT_FOUND": 1,
+    "mp02:SKIP:MP_PROJECT_NOT_FOUND": 1,
+    "mp03:SKIP:MP_PROJECT_NOT_FOUND": 1,
+    "mp04:SKIP:MP_PROJECT_NOT_FOUND": 1,
+    "mp05:SKIP:MP_PROJECT_NOT_FOUND": 1,
+    "mp06:SKIP:MP_PROJECT_NOT_FOUND": 1,
+    "mp07:SKIP:MP_PROJECT_NOT_FOUND": 1,
+    "mp08:SKIP:MP_PROJECT_NOT_FOUND": 1
+  }
+}

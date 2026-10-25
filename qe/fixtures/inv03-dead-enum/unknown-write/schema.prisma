@@ -1,0 +1,9 @@
+enum TicketStatus {
+  OPEN
+  CLOSED
+}
+
+model Ticket {
+  id     String       @id @default(cuid())
+  status TicketStatus @default(OPEN)
+}

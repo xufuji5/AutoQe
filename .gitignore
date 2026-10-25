@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.next/
+coverage/
+
+# QE generated artifacts
+qe-report/
+qe-audit/
+reports/
+# 审计输出一律写到仓外（外部审计目录）；这两条是兜底：
+# 2026-10-24 实测有人在仓根 `> scan-<project>-1.txt`，把项目名与本机路径留在了工作树
+# （未提交，但 leak 守卫当场报红 15 条 —— 差一次 `git add -A` 就永久进历史）
+scan-*.txt
+triage-*.txt
+# 本地黑名单：含内部项目代号/客户名，绝不入库；CI 用 AUTOQE_DENYLIST 注入
+qe/denylist.txt
+qe/denylist.local.txt
+# 运行期状态（第二层防护）：由引擎运行期写出，含项目身份、扫描结果与备案。
+# 第一层是隔离判据（INV-ISO）；这一层保证「即使隔离本身出错，也不会被一次 git add -A 带进历史」。
+/qe.project.json
+/qe/waivers.json
+/qe.contracts.json
+denylist.local.txt
+# 一次性诊断探针不进仓（SK036：证据留下、污染带走）。
+# 2026-10-25 实测 tmp-probe-*.ts 含本机绝对路径与另一项目代号，leak 守卫当场报红 5 条。
+scripts/tmp-*
+qe/probe/tmp-*
+qe.config.*.json
+# 例外：域预设不含任何工程信息（只有 roots/扩展名/规则开关），是随包分发的产物。
+# 不加这条，README 里让用户 `--config qe.config.miniprogram.json` 的那一行就是死链——
+# 文件在开发机上存在（被忽略），在 CI 与用户机器上从来不存在。
+!qe.config.miniprogram.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.trae/
+
+# Internal business-domain documents (not part of the public package)
+业务域/
+
+# Chinese edition of QE-04 contains internal case histories; only the redacted English edition ships
+docs/zh-CN/QE-04-audit-methodology.zh-CN.md

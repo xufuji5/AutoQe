@@ -1,0 +1,8 @@
+// 只有关系、零标量字段 —— provider 能解析（model>0），守卫扫描对象为 0：空集恒真必须红
+model Note {
+  rels Rel[]
+}
+
+model Rel {
+  notes Note[]
+}

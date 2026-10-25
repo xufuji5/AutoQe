@@ -1,0 +1,10 @@
+# Normalize line endings for contributors on Windows, macOS and Linux
+* text=auto eol=lf
+
+# Keep generated lockfiles and fixtures byte-identical across platforms
+package-lock.json text eol=lf
+*.md text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.prisma text eol=lf
