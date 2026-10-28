@@ -286,7 +286,30 @@ export const inv23 = defineGuard({
     }
     const sortedUi = [...corpusOf.keys()].sort()
 
+    // 前缀证据登记表：endpoint → 首个命中「静态前缀/${」的调用侧位置
+    const prefixEvidence = new Map<string, { file: string; line: number }>()
     const called = new Set<string>()
+    // 动态末段自动取证（2026-10-28）：字面量证不到 ≠ 界面没有。语料里若存在
+    // 「<静态前缀>/${」形态的模板串，至少证明界面在向该资源族发请求、末段由变量决定
+    // ——此时降为 warn（UI_EVIDENCE_DYNAMIC_TAIL，提示去补 dynamicTail 登记），
+    // 只有连前缀证据都没有时才 err。缺登记与真无入口是两种结论，不许混成一条红。
+    const prefixMatchers = new Map<string, RegExp>()
+    // 永不空返回：静态段不足 2 的端点映射到永不匹配的正则（(?!)），调用侧免判空
+    const prefixOf = (endpoint: string): RegExp => {
+      if (prefixMatchers.has(endpoint)) return prefixMatchers.get(endpoint)!
+      const staticSegs: string[] = []
+      for (const seg of endpoint.split('/').filter(Boolean)) {
+        if (seg.startsWith('[')) break
+        staticSegs.push(seg)
+      }
+      if (staticSegs.length < 2) {
+        prefixMatchers.set(endpoint, new RegExp('(?!)'))
+        return prefixMatchers.get(endpoint)!
+      }
+      const re = new RegExp(escapeRe('/' + staticSegs.join('/')) + '/\\$\\{', 'g')
+      prefixMatchers.set(endpoint, re)
+      return re
+    }
     const matchers = new Map<string, RegExp>()
     const fileCounts = new Map<string, number>()
     let requestFiles = 0
@@ -307,12 +330,26 @@ export const inv23 = defineGuard({
         }
         matcher.lastIndex = 0
         let m: RegExpExecArray | null
+        let hit = false
         while ((m = matcher.exec(code)) !== null) {
           if (m[0].length === 0) matcher.lastIndex++
           if (hasCall || isEndpointContext(code, m.index)) {
             called.add(route.endpoint)
+            hit = true
             break
           }
+        }
+        if (hit) continue
+        // 前缀取证：只对还没被任何语料命中的端点做，命中一次就够（首个证据文件）
+        if (prefixEvidence.has(route.endpoint)) continue
+        const pRe = prefixOf(route.endpoint)
+        pRe.lastIndex = 0
+        const p = pRe.exec(code)
+        if (p !== null && (hasCall || isEndpointContext(code, p.index))) {
+          prefixEvidence.set(route.endpoint, {
+            file: rel(ctx.root, abs),
+            line: code.slice(0, p.index).split('\n').length,
+          })
         }
       }
     }
@@ -417,13 +454,24 @@ export const inv23 = defineGuard({
       }
       const exempt = Boolean(publicRule || knownRule || externalRule)
       if (!called.has(entry.endpoint) && !exempt) {
-        findings.push(
-          err(
-            'ENTRY_NO_UI',
-            `${entry.rel}#${entry.method} ${entry.endpoint} 在界面语料中无任何请求发送点：用户点不到，功能等于未交付`,
-            { file: entry.rel, line: entry.line, entity: entry.endpoint },
-          ),
-        )
+        const ev = prefixEvidence.get(entry.endpoint)
+        if (ev) {
+          findings.push(
+            warn(
+              'ENTRY_UI_DYNAMIC_TAIL',
+              `${entry.rel}#${entry.method} ${entry.endpoint} 的末段在调用侧由变量决定（${ev.file}:${ev.line} 只能证到静态前缀）：按登记义务补 coverage.dynamicTail 举证，未登记前只降为 warn 不冒红`,
+              { file: entry.rel, line: entry.line, entity: entry.endpoint },
+            ),
+          )
+        } else {
+          findings.push(
+            err(
+              'ENTRY_NO_UI',
+              `${entry.rel}#${entry.method} ${entry.endpoint} 在界面语料中无任何请求发送点：用户点不到，功能等于未交付`,
+              { file: entry.rel, line: entry.line, entity: entry.endpoint },
+            ),
+          )
+        }
       }
     }
 
@@ -472,7 +520,7 @@ export const inv23 = defineGuard({
     }
     return {
       findings,
-      scanned: `routes=${routeFiles.length} methods=${routes.length} writeEndpoints=${writeRoutes.length} uiFiles=${sortedUi.length}(${[...fileCounts].map(([k, v]) => `${k}:${v}`).join('+')}) requestFiles=${requestFiles} called=${called.size}(dynamicTail=${dynamicTail.length}) knownNoEntry=${known.length} external=${external.length} public=${publicRoutes.length}`,
+      scanned: `routes=${routeFiles.length} methods=${routes.length} writeEndpoints=${writeRoutes.length} uiFiles=${sortedUi.length}(${[...fileCounts].map(([k, v]) => `${k}:${v}`).join('+')}) requestFiles=${requestFiles} called=${called.size}(dynamicTail=${dynamicTail.length} dynamicEvidence=${prefixEvidence.size}) knownNoEntry=${known.length} external=${external.length} public=${publicRoutes.length}`,
     }
   },
   selfTest: [
@@ -668,6 +716,16 @@ export const inv23 = defineGuard({
           dynamicTail: [{ endpoint: '/api/ticket/[id]/resolve', evidence: 'components/action-bar.tsx', reason: '' }],
         },
       },
+    },
+    {
+      // D1 翻面（2026-10-28）：不登记 dynamicTail 时旧实现判红（ENTRY_NO_UI），但语料里
+      // 明明有「/api/ticket/${…}/」前缀证据 —— 「缺登记」与「真无入口」是两种结论。
+      // 新实现：有前缀证据 → warn（UI_EVIDENCE_DYNAMIC_TAIL）；反证 = 旧实现这里是 error。
+      name: 'warn：动态末段未登记但语料有静态前缀证据 → 降 warn（旧实现判红）',
+      root: path.join(FIXTURES, 'dynamic-tail'),
+      expect: 'warn',
+      minWarnings: 1,
+      maxErrors: 0,
     },
   ],
 })

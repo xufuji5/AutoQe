@@ -56,6 +56,7 @@
     "test:isolation": "node scripts/verify-isolation.ts",
     "test:spec": "node scripts/verify-spec-tables.ts",
     "test:oracle": "node scripts/verify-rule-oracles.ts",
+    "test:idem-triage": "node scripts/verify-idem-triage.ts",
     "test:invariants-selftest": "node qe/cli.ts selftest",
     "qe:guard:inv01": "node qe/cli.ts run --only inv01",
     "qe:guard:inv02": "node qe/cli.ts run --only inv02",
@@ -103,7 +104,7 @@
     "qe:skills": "node qe/cli.ts skills --check",
     "qe:ratchet": "node qe/cli.ts run",
     "qe:ratchet:update": "node qe/cli.ts ratchet-update",
-    "qe:ci": "npm run typecheck && npm run test:invariants && npm run qe:skills && npm run test:triage && npm run test:isolation && npm run test:spec && npm run test:oracle && npm run qe:report"
+    "qe:ci": "npm run typecheck && npm run test:invariants && npm run qe:skills && npm run test:triage && npm run test:isolation && npm run test:spec && npm run test:oracle && npm run test:idem-triage && npm run qe:report"
   },
   "dependencies": {
     "typescript": "5.9.3"

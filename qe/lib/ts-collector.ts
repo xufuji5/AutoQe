@@ -1,5 +1,6 @@
 import ts from 'typescript'
 import path from 'node:path'
+import fsSync from 'node:fs'
 import { readText, rel, walkFiles } from './fs.ts'
 import { defaultSourceExtensions } from './config.ts'
 import { recordStage } from './profile.ts'
@@ -61,12 +62,16 @@ function cacheFor(root: string): Map<string, { text: string; ast: ts.SourceFile 
   return cache
 }
 
-async function loadDirs(root: string, config: QeConfig, dirs: string[]): Promise<SourceFileInfo[]> {
+async function loadDirs(root: string, config: QeConfig, dirs: string[], extraFiles: string[] = []): Promise<SourceFileInfo[]> {
   const cache = cacheFor(root)
   const extensions = config.source.extensions.length ? config.source.extensions : defaultSourceExtensions
-  const batches = await Promise.all(
-    dirs.map((dir) => walkFiles(root, dir, { ignore: config.ignore, ext: extensions })),
-  )
+  const batches = await Promise.all([
+    ...dirs.map((dir) => walkFiles(root, dir, { ignore: config.ignore, ext: extensions })),
+    // source.files 不走 walk（单文件直取），但同样受 extensions 约束（声明错扩展名=空转）
+    ...extraFiles
+      .filter((f) => extensions.some((e) => f.endsWith(e)))
+      .map(async (f) => (fsSync.existsSync(f) ? [f] : [])),
+  ])
   const files = [...new Set(batches.flat())].sort()
   const tStart = performance.now()
   let readMs = 0
@@ -96,7 +101,15 @@ async function loadDirs(root: string, config: QeConfig, dirs: string[]): Promise
 }
 
 export async function loadTsSources(root: string, config: QeConfig): Promise<SourceFileInfo[]> {
-  return loadDirs(root, config, config.source.roots)
+  // 根级单文件（NextAuth v5 的 auth.ts 等）与 roots 合并进同一批：它们走同样的
+  // 解析/缓存/判据管线，唯一区别是定位方式（文件 vs 目录）。
+  // 声明了但不存在：doctor（cli 预检）负责报，这里静默跳过与 roots 缺目录同策略。
+  const extra = (config.source.files ?? [])
+    .map((f) => f.replace(/\\/g, '/'))
+    .filter((f) => f.length > 0)
+    .map((f) => path.resolve(root, f))
+    .filter((f) => fsSync.existsSync(f) && fsSync.statSync(f).isFile())
+  return loadDirs(root, config, config.source.roots, extra)
 }
 
 /**

@@ -1,0 +1,11 @@
+model User {
+  id    String @id @default(cuid())
+  email String @unique
+}
+
+model Account {
+  id                String @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+}

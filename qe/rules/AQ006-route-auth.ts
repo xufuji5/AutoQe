@@ -31,97 +31,10 @@
  */
 import { stripComments } from '../lib/code-only.ts'
 import { isRouteFile, lineOf } from '../lib/rule-helpers.ts'
+import { allMethodsDeclaredPublic, authVocabulary, hasAuthEvidence, routePathCovers } from '../lib/auth-evidence.ts'
 import { toGuard, type RawHit, type RuleCtx } from '../lib/rule-guard.ts'
 
 const METHOD_RE = /^\s*export\s+(?:async\s+)?(?:function|const)\s+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b/gm
-
-/**
- * 鉴权入口名册。这一栏**必然列不全** —— 它是「常见形态」而不是「完整集合」。
- *
- * 首轮实测（试点 A 152 处误报）证明：靠列名字判鉴权，换一个项目就全错
- * （`requirePermission` / `requireMerchantScope` / `cronSecretMatches` 都不在名单里）。
- *
- * 所以第二版改成**两级判据**：
- *   ① 精确名单（上面的常用名）；
- *   ② **词干匹配**：handler 里 `await X(...)` 的 X 名含鉴权语义词干
- *      （auth / session / permission / scope / guard / token / jwt / signature / secret / credential / login / admin）。
- *
- * ②会漏（叫 `checkAccess()` 的判不出来），但漏的方向是「少报」；宁可漏也不要把
- * 137 个有鉴权的路由写成「裸奔」—— 那会让整条规则失去信用，然后被关掉。
- * 项目可用 `authPatterns` / `authModules` 补。
- */
-const AUTH_RE =
-  /\b(auth|getServerSession|getSession|currentUser|getCurrentUser|requireUser|requireAuth|requireAdmin|requireRole|requirePermission|hasPermission|checkPermission|assertAdmin|assertPermission|verifyAdmin|isAdmin|adminGuard|withAuth|verifyToken|verifySignature|validateSession|authorize|guard)\b/
-
-/** 鉴权语义词干（二级判据）。刻意不含 member/owner/tenant —— 那些是业务词，会大面积误判。 */
-const AUTH_WORD =
-  /(auth|session|permission|perms|role|scope|guard|token|jwt|signature|secret|credential|login|admin|acl|rbac|privilege|identity|principal)/i
-
-/**
- * 三级判据：**动词 + 名词**的结构判定（首轮外部试跑撞出来的第二条硬教训）。
- *
- * 只靠列名字必然漏：试点 A 的主力守卫叫 `requireMerchant(...)`，
- * 而名单里只有 requireAuth/requireUser/requirePermission —— 于是 21 个有鉴权的路由
- * 被报成「裸奔」。加一个 `requireMerchant` 进去只是把这个问题推到下一个项目。
- *
- * 结构与语言无关：守卫调用的形状是「使令动词 + 受保护对象」。
- *   requireMerchant / assertAdminAccess / ensureSession / withMerchantScope  → 是守卫
- *   requireEnv / assertValid / ensureDir / checkFormat                      → 不是守卫（名词不在受保护对象里）
- * 两个条件必须**同时**成立，这既认得出新名字，又不会被 `assertValid` 骗过。
- */
-const GUARD_VERB_RE = /^(?:require|assert|ensure|check|guard|with|verify)[A-Z][\w$]*$/
-const GUARD_NOUN_RE =
-  /(Auth|Admin|User|Member|Merchant|Role|Permission|Perms?|Session|Scope|Access|Owner|Identity|Principal|Token|Signature|Login|Guard|Privilege|Actor|Tenant)/
-
-/** 显式返回这些错误码的路由，必然是鉴权感知的（试点 A 的主力写法） */
-const AUTH_ERROR_CODE_RE = /\b(AUTH_REQUIRED|UNAUTHENTICATED|UNAUTHORIZED|NOT_LOGGED_IN|FORBIDDEN|SESSION_EXPIRED)\b/
-
-/** 取 `await foo(` / `foo(` 的函数名，喂给词干判据 */
-const CALL_NAME_RE = /\b([A-Za-z_$][\w$]*)\s*\(/g
-
-/**
- * 四级判据：「鉴权在领域 helper 里」的**结构**形态。
- *
- * 目标仓的鉴权入口常常收下整个 request 再自己决定怎么认人：
- *   `const merchant = await resolveMerchant(request)` → `if (!merchant) return apiError(...)`
- *   `const ctx = await getMerchantAccessContext(req)` → 后续按 ctx 分支
- *   `const result = await sendHighRiskSmsCode(request, permission)` → `if (!result.ok) return ...`
- * 这些函数名千奇百怪（resolve / get / send），但形状一样：**请求对象进、判定结果出、判空即拒**。
- *
- * 为什么不看函数名：见文件头 —— 列名字只是把问题推到下一个项目。这里只看形状。
- * 代价：`parseBody(req)` 后 `if (!body) return 400` 也会被认成鉴权（漏报方向，可接受，
- * 且这类文件通常另有真实鉴权或已进 publicPaths）。
- */
-function hasAuthHelperShape(codes: string): boolean {
-  const re = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*await\s+[\w$.]+\(\s*(?:request|req)\s*[,)]/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(codes)) !== null) {
-    const bound = m[1]
-    const after = codes.slice(m.index, m.index + 1200)
-    const guard = new RegExp(`if\\s*\\(\\s*!\\s*${bound}(?:\\.\\w+)?\\b`)
-    if (guard.test(after)) return true
-    // `if (!result.ok)` / `if (result.error)` 同样是否定式判定
-    if (new RegExp(`if\\s*\\(\\s*!\\s*${bound}\\.\\w+`).test(after)) return true
-  }
-  return false
-}
-
-function hasAuthCall(codes: string, extra: readonly RegExp[]): boolean {
-  if (AUTH_RE.test(codes)) return true
-  if (AUTH_ERROR_CODE_RE.test(codes)) return true
-  if (extra.some((re) => re.test(codes))) return true
-  if (hasAuthHelperShape(codes)) return true
-  // 二级：任一被调用（await 或直接）的函数名含鉴权词干
-  CALL_NAME_RE.lastIndex = 0
-  let m: RegExpExecArray | null
-  while ((m = CALL_NAME_RE.exec(codes)) !== null) {
-    const name = m[1]
-    if (name.length < 4) continue
-    if (AUTH_WORD.test(name)) return true
-    if (GUARD_VERB_RE.test(name) && GUARD_NOUN_RE.test(name)) return true
-  }
-  return false
-}
 
 const DEFAULT_PUBLIC = [
   'app/api/health/route',
@@ -155,32 +68,22 @@ export const aq06 = toGuard({
     while ((m = METHOD_RE.exec(codes)) !== null) methods.push({ name: m[1], index: m.index })
     if (methods.length === 0) return []
 
-    // 鉴权关键词在**全文**出现即算（含 import 与 middleware 注入）
-    const extraPatterns = ((ctx.options.authPatterns as string[] | undefined) ?? []).map((p) => new RegExp(p))
-    const authModules = (ctx.options.authModules as string[] | undefined) ?? []
-    const importedFromAuthModule = authModules.some((mod) =>
-      new RegExp(`from\\s+['"][^'"]*${mod.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(codes),
-    )
-    if (importedFromAuthModule || hasAuthCall(codes, extraPatterns)) return []
+    // 鉴权词表/公共路由与 inv20 同源（lib/auth-evidence.ts）：同一概念不许有两个答案。
+    // 项目把词表写在 boundaries.* 即可，不必再维护一份 rules.aq06.*。
+    const vocab = authVocabulary(ctx.config)
 
-    const declared = [
-      ...DEFAULT_PUBLIC,
-      ...((ctx.options.publicPaths as string[] | undefined) ?? []),
-    ]
-    // 前缀必须落在**目录边界**上：`app/api/auth/` 不该命中 `app/api/auth-evil/route.ts`。
-    // 第一版是裸 `rel.startsWith(p)` —— 那正是本仓库另一条判据（假绿锚点）抓的病：
-    // 用前缀匹配当安全边界，该拒绝的请求被放过。
-    const covers = (p: string): boolean => {
-      if (p.startsWith('^')) return new RegExp(p).test(rel)
-      const base = p.replace(/\/$/, '')
-      return rel === base || rel.startsWith(base + '/') || rel.startsWith(base + '.')
+    // 鉴权关键词在**全文**出现即算（含 import 与 middleware 注入）
+    if (hasAuthEvidence(codes, { patterns: vocab.patterns, authModules: vocab.authModules, importsText: codes })) {
+      return []
     }
-    if (declared.some(covers)) return []
+
+    // 公共路由登记**按方法**判：整文件豁免会把同文件里鉴权面（写入 POST）的覆盖一起丢掉。
+    const declared = [...DEFAULT_PUBLIC.map((file) => ({ file })), ...vocab.publicRoutes]
+    if (allMethodsDeclaredPublic(rel, methods.map((x) => x.name), declared)) return []
 
     // 中间件统一鉴权的前缀（如 proxy.ts 对 `/api/admin` 全线做 IP 白名单 + 会话 + 角色校验）。
     // 本规则看不到中间件，只能靠声明；声明必须是**前缀**且只影响该前缀，不许写成项目根。
-    const mwProtected = ((ctx.options.middlewareProtected as string[] | undefined) ?? [])
-    if (mwProtected.some(covers)) return []
+    if (vocab.middlewareProtected.some((p) => routePathCovers(p, rel))) return []
 
     return [
       {

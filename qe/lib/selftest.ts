@@ -1,5 +1,6 @@
 import { defaultConfig, mergeConfig } from './config.ts'
 import { registry as defaultRegistry } from '../registry/registry.ts'
+import { NotApplicable } from './not-applicable.ts'
 import type { Guard, GuardCase } from './guard.ts'
 
 export interface SelfTestCaseResult {
@@ -42,6 +43,7 @@ export async function runSelfTest(
       let warnings = 0
       let infos = 0
       let detail: string | undefined
+      let skipCode: string | undefined
       try {
         const result = await guard.run(ctx)
         errors = result.findings.filter((f) => f.level === 'error').length
@@ -49,6 +51,26 @@ export async function runSelfTest(
         infos = result.findings.filter((f) => f.level === 'info').length
       } catch (e) {
         detail = (e as Error).message
+        if (e instanceof NotApplicable) skipCode = e.code
+      }
+      // `expect: 'skip'` 是唯一把 NotApplicable 当通过的期望：断言「这里该跳过」本身
+      // 就是一条判据（射程为 0 时必须走 NotApplicable，而不是给一个空集恒真的绿）。
+      // 其余期望遇到 NotApplicable 一律 FAIL —— 否则「把射程关掉」就能让任何坏样本变绿。
+      if (c.expect === 'skip') {
+        const pass = skipCode !== undefined
+        detail = pass ? `skip:${skipCode}` : (detail ?? `expect=skip 但守卫未抛 NotApplicable（errors=${errors} warnings=${warnings}）`)
+        results.push({
+          guard: guard.id,
+          title: guard.title,
+          caseName: c.name,
+          expect: c.expect,
+          pass,
+          errors,
+          warnings,
+          infos,
+          detail,
+        })
+        continue
       }
       const pass = detail === undefined && expectationMet(c, errors, warnings, infos)
       results.push({

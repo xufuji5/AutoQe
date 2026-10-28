@@ -8,9 +8,14 @@
  *
  * 所以「断言对象指向哪」本身要被判：config 里声明的每个断言对象路径
  * （schema.path / source.roots / contracts / spec.docs / stores.moduleRoots）必须
- *   1. 存在——否则判据在虚空上空转；
- *   2. 未被 git 忽略——否则它根本不是可提交物，开发机/CI 各说各话；
- *   3. 已被 git 跟踪（目录则至少含一个被跟踪文件）——存在但没入库，与 2 同病。
+ *   1. 存在——否则判据在虚空上空转（error）；
+ *   2. 未被 git 忽略——否则它根本不是可提交物，开发机/CI 各说各话（error）；
+ *   3. 已被 git 跟踪（目录则至少含一个被跟踪文件）。
+ *
+ * 第 3 条单独降为 warn：**未跟踪 ≠ 不可提交**。刚 init 的仓、正在引入的台账、
+ * 还没做首次提交的新目录都处在这一档，提交后即消失；把它判红等于要求
+ * 「先把文件提交了，再让判据通过」，而判据本身又跑在提交之前。真正不可提交的
+ * 只有被 ignore 的那一档（第 2 条），它才是 error。
  *
  * 三条都必须问 git，所以非 git 工作树 / git 不可用时整条不适用（NotApplicable），
  * 不许假绿。判定顺序即上列顺序：missing 不依赖 git 也照此报，保证三档语义不混。
@@ -19,7 +24,7 @@
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import { stat } from 'node:fs/promises'
-import { defineGuard, err, info } from '../lib/guard.ts'
+import { defineGuard, err, info, warn } from '../lib/guard.ts'
 import type { Finding } from '../lib/guard.ts'
 import type { QeConfig } from '../lib/config.ts'
 import { NotApplicable } from '../lib/not-applicable.ts'
@@ -84,7 +89,7 @@ export const inv24 = defineGuard({
     '只覆盖 qe.config.json 的声明位（schema.path / source.roots / contracts / spec.docs / stores.moduleRoots）；qe/rules/ 规则层的内联夹具是字符串不是路径，不在射程',
     'qe/probe 运行时探针的断言对象在运行期才知道，不在射程',
     '目录只查「目录自身是否被忽略 + 是否至少有一个被跟踪文件」；目录内部个别文件被忽略不逐层展开（check-ignore 全量递归的读数噪声大于收益）',
-    'UNTRACKED 一档无法用静态夹具自证（提交进仓的文件必然已被跟踪），自证用 .git（恒存在、恒零跟踪）替代——形状相同，语义换成「目录里没有任何可提交物」',
+    'UNTRACKED 一档判 warn 不判红（未跟踪是「还没提交」，提交后即消失；只有 ignored 才不可提交），自证用 .git（恒存在、恒零跟踪）替代静态夹具',
     'check-ignore 读的是工作树里的 .gitignore：.gitignore 自身未提交时规则仍生效，但「.gitignore 本身是不是可提交物」不在本判据射程',
   ],
   async run(ctx) {
@@ -133,9 +138,9 @@ export const inv24 = defineGuard({
       if (tracked.stdout.trim() === '') {
         untracked++
         findings.push(
-          err(
+          warn(
             'ASSERT_ON_UNTRACKED',
-            `${t.label} 指向存在但未被 git 跟踪的${st.isDirectory() ? '目录（其中没有任何已入库文件）' : '文件'} ${t.rel}：提交不了的东西当判据对象，干净检出即空转`,
+            `${t.label} 指向存在但尚未纳入版本控制的${st.isDirectory() ? '目录（其中没有任何已入库文件）' : '文件'} ${t.rel}：属「还没提交」的中间态，提交后即消失；在此之前干净检出没有该对象，判据会跳过而不是假绿`,
             { entity: t.label },
           ),
         )
@@ -201,13 +206,15 @@ export const inv24 = defineGuard({
       },
     },
     {
-      // 未跟踪无法做成静态夹具（入库即被跟踪）。.git 恒存在、恒零跟踪，且在不带 .git 的
-      // 分发形态（npm 包）里退化为 ASSERT_TARGET_MISSING——两种形态都是 red，读数稳定。
-      name: 'bad：断言对象存在但没有任何已入库文件（.git 恒为零跟踪目录）',
+      // 未跟踪 ≠ 不可提交：它是「还没提交」的中间态（新仓/刚 init/正在引入），提交后即消失。
+      // 只有 ignored 才是「永远提交不了」。所以这一档判 warn，不判红。
+      // 用 .git 做静态替身（恒存在、恒零跟踪），在不带 .git 的分发形态里退化为 ASSERT_TARGET_MISSING。
+      name: 'warn：断言对象存在但尚未入库（.git 恒为零跟踪目录；旧判据判红）',
       root: REPO_ROOT,
-      expect: 'red',
-      minErrors: 1,
-      maxErrors: 1,
+      expect: 'warn',
+      minWarnings: 1,
+      maxWarnings: 1,
+      maxErrors: 0,
       config: {
         schema: { provider: 'prisma', path: '.git', clientNames: [] },
         source: { collector: 'none', roots: [], extensions: [] },

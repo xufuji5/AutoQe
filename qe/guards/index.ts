@@ -30,6 +30,7 @@ import { aq11 } from '../rules/AQ011-hardcoded-tool-path.ts'
 import { aq12 } from '../rules/AQ012-mock-reachable.ts'
 import { aq13 } from '../rules/AQ013-hardcoded-datasource.ts'
 import { aq14 } from '../rules/AQ014-tx-scoped-conflict-fallback.ts'
+import { aq15 } from './aq15-reuse-opportunity.ts'
 import { mp01 } from '../rules/MP001-timer-after-unload.ts'
 import { mp02 } from '../rules/MP002-component-style-isolation.ts'
 import { mp03 } from '../rules/MP003-setdata-before-first-render.ts'
@@ -75,6 +76,7 @@ export const guards: Guard[] = [
   aq12,
   aq13,
   aq14,
+  aq15,
   // 小程序域（`miniprogram/`）：宿主是双线程模型 + 页面栈 + 样式隔离，
   // 它的缺陷几乎都不报错——只在真机上表现成「样式没了/点了没反应/整块白掉」。
   mp01,

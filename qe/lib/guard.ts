@@ -27,8 +27,11 @@ export interface GuardResult {
 export interface GuardCase {
   name: string
   root: string
-  /** red = 必须有 error；warn = 无 error 但必须有 warn；info = 无红无黄但必须有 info（提示档）；green = 一条都没有 */
-  expect: 'red' | 'warn' | 'info' | 'green'
+  /**
+   * red = 必须有 error；warn = 无 error 但必须有 warn；info = 无红无黄但必须有 info（提示档）；
+   * green = 一条都没有；skip = 必须抛 NotApplicable（射程空集必须显式跳过，不许报绿）。
+   */
+  expect: 'red' | 'warn' | 'info' | 'green' | 'skip'
   minErrors?: number
   minWarnings?: number
   minInfos?: number

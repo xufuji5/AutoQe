@@ -458,6 +458,32 @@ export const POLICIES: Record<string, Policy> = {
       L('B Fix the path', 'B 修正路径'),
     ],
   },
+  PUBLIC_ROUTE_SHAPE: {
+    disposition: 'fix',
+    meaning: L(
+      'boundaries.publicRoutes contains entries that are not `{ file, reason }` objects (legacy string arrays) — the registration silently stops working.',
+      'boundaries.publicRoutes 里有不是 `{ file, reason }` 对象的条目（旧版字符串数组）→ 公共登记会整块静默失效。',
+    ),
+    action: L(
+      'Rewrite each entry as `{ "file": "...", "reason": "..." }`; the config loader now rejects wrong shapes with CONFIG_SHAPE.',
+      '把每条改成 `{ "file": "...", "reason": "..." }`；配置加载器现在会以 CONFIG_SHAPE 直接拒绝错误形状。',
+    ),
+  },
+  DUPLICATE_BLOCK: {
+    disposition: 'decide',
+    meaning: L(
+      'The same code block is copy-pasted across three or more files — a reuse opportunity, not a defect.',
+      '同一段代码被粘贴到三个以上文件 → 复用机会，不是缺陷。',
+    ),
+    action: L(
+      'Decide whether to extract a shared function or leave it duplicated; no automatic change.',
+      '决定是否抽成共用函数，或保持原样；不做任何自动修改。',
+    ),
+    options: [
+      L('A Extract a shared function or component', 'A 抽成共用函数 / 组件'),
+      L('B Keep the copies (templated on purpose) and note why', 'B 保持重复（刻意模板化），写下理由'),
+    ],
+  },
   CLIENT_IMPORTS_SERVER: {
     disposition: 'decide',
     meaning: L(
@@ -670,10 +696,13 @@ export const POLICIES: Record<string, Policy> = {
   ASSERT_ON_UNTRACKED: {
     disposition: 'fix',
     meaning: L(
-      'An assertion target exists but is not tracked by git — it cannot be committed, so a clean checkout turns the criterion into an empty scan.',
-      '断言对象存在但未被 git 跟踪 → 它提交不了，干净检出后判据变成扫空集。',
+      'An assertion target exists but is not tracked yet — it is committable, just not committed. A clean checkout has no such object; the criterion skips there instead of going false-green.',
+      '断言对象存在但尚未纳入版本控制 —— 可提交、只是还没提交。干净检出里没有该对象，判据在那时会跳过而不是假绿。',
     ),
-    action: L('git add the target (or the files under the directory).', '把目标（或目录下的文件）git add 入库。'),
+    action: L(
+      'git add the target (or the files under the directory); the warning disappears once it is committed.',
+      '把目标（或目录下的文件）git add 入库；提交后这条警告即消失。',
+    ),
     options: [
       L('A Commit the target (recommended)', 'A 把目标入库（推荐）'),
       L('B Point the criterion at an already tracked path', 'B 把判据改指已跟踪路径'),

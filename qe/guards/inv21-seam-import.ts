@@ -100,11 +100,14 @@ export const inv21 = defineGuard({
     let clientFiles = 0
     let importCount = 0
     let crossModule = 0
+    const moduleDirs = new Set<string>()
 
     for (const src of sources) {
       const sf = sfOf(src)
       const isClient = hasDirective(sf, 'use client')
       if (isClient) clientFiles++
+      const ownModule = moduleDirOf(src.rel, moduleRoots)
+      if (ownModule) moduleDirs.add(ownModule)
       const imports = importSpecs(sf)
       importCount += imports.length
 
@@ -135,6 +138,10 @@ export const inv21 = defineGuard({
         }
 
         if (!targetRel) continue
+        // 只判**相对路径**跨模块导入：判据自己的文案是「应走公开入口或别名」，
+        // 那别名导入就不能同时被判红。第一版把两者都报，在真实仓里制造了 1433 条
+        // 「用相对路径跨模块导入 @/lib/…」——文案与判据互相矛盾，整条判据因此失去信用。
+        if (!imp.spec.startsWith('.')) continue
         const fromModule = moduleDirOf(src.rel, moduleRoots)
         const toModule = moduleDirOf(targetRel, moduleRoots)
         if (fromModule && toModule && fromModule !== toModule) {
@@ -150,12 +157,20 @@ export const inv21 = defineGuard({
       }
     }
 
+    // 一个模块都没解析出来 = 跨模块面**没有对象**，此时任何「0 命中」都不是干净，是空集恒真。
+    // 只有客户端/服务端面真的报了东西才返回 findings；否则显式跳过（D1：空集不许报绿）。
+    if (findings.length === 0 && moduleDirs.size === 0) {
+      throw new NotApplicable(
+        'NO_MODULE_ROOTS_FOUND',
+        `stores.moduleRoots=${moduleRoots.join(',')} 下解析到 0 个模块：跨模块面不适用（客户端/服务端面已扫 ${clientFiles} 个客户端文件、${importCount} 条导入，未发现泄漏）`,
+      )
+    }
     if (findings.length === 0) {
-      findings.push(info('SEAM_CLEAN', `客户端文件 ${clientFiles} 个，导入 ${importCount} 条，无跨层/跨模块泄漏`))
+      findings.push(info('SEAM_CLEAN', `客户端文件 ${clientFiles} 个，导入 ${importCount} 条，跨模块 ${moduleDirs.size} 个模块，无跨层/跨模块泄漏`))
     }
     return {
       findings,
-      scanned: `files=${sources.length} clientFiles=${clientFiles} imports=${importCount} crossModule=${crossModule} modules=${moduleRoots.join('+')}`,
+      scanned: `files=${sources.length} clientFiles=${clientFiles} imports=${importCount} crossModule=${crossModule} modules=${moduleRoots.join('+')} resolvedModules=${moduleDirs.size}`,
     }
   },
   selfTest: [
@@ -177,14 +192,18 @@ export const inv21 = defineGuard({
       name: 'good：目标文件只在注释里提到服务端实现（旧判据按原文匹配会假红）',
       root: path.join(FIXTURES, 'comment'),
       expect: 'green',
-      config: { source: { collector: 'ts', roots: ['src'], extensions: [] } },
+      // 本样本只验客户端/服务端面；模块根显式声明，避免「0 个模块」触发不适用（空集不许报绿）
+      config: { source: { collector: 'ts', roots: ['src'], extensions: [] }, stores: { moduleRoots: ['src'] } },
     },
     {
       name: 'bad：客户端经 tsconfig paths 别名触达服务端实现（旧判据解析不到别名）',
       root: path.join(FIXTURES, 'alias'),
       expect: 'red',
       minErrors: 1,
-      config: { source: { collector: 'ts', roots: ['src'], extensions: [] } },
+      // 同时钉住「别名跨模块不算相对路径跨模块」：旧判据会在这里多报一条 CROSS_MODULE_RELATIVE，
+      // 而判据自己的文案写着「应走公开入口或别名」——文案与判据互相矛盾。
+      maxWarnings: 0,
+      config: { source: { collector: 'ts', roots: ['src'], extensions: [] }, stores: { moduleRoots: ['src'] } },
     },
     {
       name: 'warn：客户端经 barrel 再导出链触达服务端实现（旧判据只看直接目标；隔 hop 降为 warn）',
@@ -197,19 +216,34 @@ export const inv21 = defineGuard({
       name: 'good：客户端导入 use-server 动作模块不算接缝泄漏（RPC 边界）',
       root: path.join(FIXTURES, 'server-action'),
       expect: 'green',
-      config: { source: { collector: 'ts', roots: ['src'], extensions: [] } },
+      // 同上：显式声明模块根，保证「跨模块面」有对象可判
+      config: { source: { collector: 'ts', roots: ['src'], extensions: [] }, stores: { moduleRoots: ['src'] } },
+    },
+    {
+      // 反证 D1：模块根解析出 0 个模块时，0 命中是**空集恒真**，必须 skipped 而不是 green。
+      // 旧判据在这里返回 SEAM_CLEAN（绿），于是「模块根配错」在读数上与「真的没跨模块导入」一模一样。
+      name: 'skip：moduleRoots 下 0 个模块时显式不适用（旧判据在这里假绿）',
+      root: path.join(FIXTURES, 'comment'),
+      expect: 'skip',
+      config: { source: { collector: 'ts', roots: ['src'], extensions: [] }, stores: { moduleRoots: ['src/features', 'src/modules'] } },
     },
   ],
 })
 
-/** 文件所属模块目录：moduleRoots/<module> 的第一层 */
+/**
+ * 文件所属模块目录：moduleRoots/<module> 的第一层。
+ *
+ * 根目录下的**直接子文件**归属模块根本身（`lib/db.ts` → `lib`）：公共入口/共用工具
+ * 常平铺在模块根，把它们判成「不在任何模块」会让跨模块判据漏掉一批真实深导入。
+ */
 function moduleDirOf(rel: string, moduleRoots: string[]): string | null {
   for (const root of moduleRoots) {
     const clean = root.replace(/\/+$/, '')
     if (rel === clean || !rel.startsWith(clean + '/')) continue
     const rest = rel.slice(clean.length + 1)
     const seg = rest.split('/')[0]
-    if (!seg || !rest.includes('/')) return null
+    if (!seg) return null
+    if (!rest.includes('/')) return clean
     return `${clean}/${seg}`
   }
   return null

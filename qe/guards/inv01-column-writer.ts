@@ -10,6 +10,40 @@ const FIXTURES = path.join(import.meta.dirname, '../fixtures/inv01-column-writer
 const GENERIC_FIELD = /^(id|tenantId|userId|batchId|status|type|name|code|version|createdAt|updatedAt|deletedAt)$/
 
 /**
+ * Auth.js 标准表（adapter 模板）。这些模型的写入发生在依赖内部：
+ * `@auth/prisma-adapter` 在登录/建会话时自己 `create/update`，本仓源码里根本没有 `data` 键。
+ * 按「零写入 = 死表」报红，等于要求业务代码重抄一遍 adapter —— 真实仓实测 3 张表全报。
+ */
+const AUTHJS_TEMPLATE_MODELS = new Set(['Account', 'Session', 'VerificationToken', 'Authenticator'])
+const AUTHJS_DEPS = ['@auth/prisma-adapter', 'next-auth', '@auth/core']
+
+/**
+ * 从 package.json 读「adapter 是否真的装着」。
+ *
+ * 只认依赖名，不猜 `auth.config.ts` 里有没有配 adapter：静态判据读不到运行期选择。
+ * 因此豁免条件收得很紧——表名命中模板 **且** 依赖在册；缺一个都照旧判红。
+ */
+async function authJsAdapterEvidence(ctx: GuardContext): Promise<string | null> {
+  const text = await readTextSafe(path.resolve(ctx.root, ctx.config.packageJson))
+  if (text === null) return null
+  let pkg: Record<string, unknown>
+  try {
+    pkg = JSON.parse(text) as Record<string, unknown>
+  } catch {
+    return null
+  }
+  const names = new Set<string>()
+  for (const block of ['dependencies', 'devDependencies', 'peerDependencies']) {
+    const value = pkg[block]
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const name of Object.keys(value)) names.add(name)
+    }
+  }
+  const hit = AUTHJS_DEPS.filter((d) => names.has(d))
+  return hit.length > 0 ? hit.join(' + ') : null
+}
+
+/**
  * 「这个字段名在页面层出现过吗」的名字级索引（.tsx 里的标识符计数）。
  * 只用来给死列分档，不做模型归属推断——用来回答「用户看不看得到这个空栏」，
  * 而不是「哪一行渲染了它」。同名跨模型的字段可能被误判为可见，属已知代价，已写入盲区。
@@ -38,7 +72,7 @@ export const inv01 = defineGuard({
   blindSpots: [
     'Prisma Client 的 create/update 键认全；$executeRaw/$queryRaw 只按「DML + 表名」归属到模型并降级为「写入覆盖未知」，列级写入仍不可见',
     '归属不到模型的原生 SQL 写点只出 RAW_WRITE_UNATTRIBUTED 候选（warn），不判死列；候选只报应用面，evidenceRoots 的造数脚本不出候选',
-    '依赖内部（PrismaAdapter 等）在运行期写入的模型，需用 fieldExemptions 的 field="*" 声明（理由必填）',
+    'Auth.js 模板表（Account/Session/VerificationToken/Authenticator）在 package.json 依赖到 @auth/prisma-adapter / next-auth / @auth/core 时降为 info——只认依赖名，读不到 auth 配置里运行期是否真的接上 adapter；其它依赖内部写入的模型仍需用 fieldExemptions 的 field="*" 声明（理由必填）',
     '有 @default / @updatedAt 的列不判零写入（DB 侧有值来源）；默认值导致状态永不推进属 inv03 射程',
     '嵌套写（items: { create: [...] }）、DB 触发器不算业务写点',
     '同名但不同 model 的字段按 model 维度隔离，不做类型推理',
@@ -48,6 +82,7 @@ export const inv01 = defineGuard({
   async run(ctx) {
     const scan = await scanColumns(ctx.root, ctx.config)
     const ui = await uiMentionIndex(ctx)
+    const authJs = await authJsAdapterEvidence(ctx)
     const findings = []
     const uncertain = new Map<string, number>()
     const live = new Map<string, typeof scan.fields>()
@@ -84,6 +119,19 @@ export const inv01 = defineGuard({
         // 聚合档只提示有辨识度的列名。
         const visible = names.filter((n) => ui.has(n) && !GENERIC_FIELD.test(n))
         const shown = names.slice(0, 8).join('/') + (names.length > 8 ? ` 等 ${names.length} 列` : '')
+        // Auth.js 模板表：写入在 adapter 依赖内部，源码里必然看不到 data 键。
+        // 降级为 info 而不是豁免（读数里仍可见），并写明机制，避免下次又当成死表删掉。
+        if (authJs && AUTHJS_TEMPLATE_MODELS.has(model)) {
+          findings.push(
+            info(
+              'MODEL_UNUSED_ADAPTER',
+              `${model} 全模型零写入（${fields.length} 列：${shown}），但依赖 ${authJs} 是 Auth.js adapter：` +
+                '该表由库在登录/建会话时运行期写入（源码内无 data 键），不判死表；若本仓未启用 adapter，请移除依赖或补写点',
+              { entity: model, file: ctx.config.schema.path, line: fields[0].line },
+            ),
+          )
+          continue
+        }
         findings.push(
           err(
             'MODEL_UNUSED',
@@ -266,6 +314,27 @@ export const inv01 = defineGuard({
       },
     },
     {
+      // 反证：root 级 auth.ts 里有唯一写点，但不声明 source.files → 判红。
+      // NextAuth v5 约定把 auth.ts 放仓根，roots 只认目录，旧引擎对这类文件永远失明。
+      name: 'red：根级文件里的唯一写点未声明 source.files 时照旧判死列（反证）',
+      root: path.join(FIXTURES, 'root-file-writer'),
+      expect: 'red',
+      minErrors: 1,
+      config: {
+        schema: { provider: 'prisma', path: 'schema.prisma', clientNames: ['prisma', 'db', 'tx'] },
+        source: { collector: 'ts', roots: ['src'], extensions: [] },
+      },
+    },
+    {
+      name: 'good：source.files 声明根级 auth.ts 后写点可见，不再判死列',
+      root: path.join(FIXTURES, 'root-file-writer'),
+      expect: 'green',
+      config: {
+        schema: { provider: 'prisma', path: 'schema.prisma', clientNames: ['prisma', 'db', 'tx'] },
+        source: { collector: 'ts', roots: ['src'], files: ['auth.ts'], extensions: [] },
+      },
+    },
+    {
       name: 'good：适配器模型用 field="*" 模型级豁免（理由必填），旧判据会整表判死列',
       root: path.join(FIXTURES, 'adapter-model'),
       expect: 'green',
@@ -275,6 +344,31 @@ export const inv01 = defineGuard({
         fieldExemptions: [
           { model: 'Account', field: '*', reason: '由 @auth/prisma-adapter 在运行期写入，源码内无 data 键' },
         ],
+      },
+    },
+    {
+      // 反证 D1：没有 adapter 依赖时，Account 表零写入就是真缺陷，必须仍判红。
+      name: 'red：package.json 没有 Auth.js 依赖时，模板表零写入仍判死表（豁免不能靠表名猜）',
+      root: path.join(FIXTURES, 'authjs-no-adapter'),
+      expect: 'red',
+      minErrors: 1,
+      maxErrors: 1,
+      maxWarnings: 0,
+      config: {
+        schema: { provider: 'prisma', path: 'schema.prisma', clientNames: ['prisma', 'db', 'tx'] },
+        source: { collector: 'ts', roots: ['src'], extensions: [] },
+      },
+    },
+    {
+      name: 'info：装了 @auth/prisma-adapter 时，模板表零写入降为 info（旧判据整表判红）',
+      root: path.join(FIXTURES, 'authjs-adapter'),
+      expect: 'info',
+      minInfos: 1,
+      maxErrors: 0,
+      maxWarnings: 0,
+      config: {
+        schema: { provider: 'prisma', path: 'schema.prisma', clientNames: ['prisma', 'db', 'tx'] },
+        source: { collector: 'ts', roots: ['src'], extensions: [] },
       },
     },
   ],

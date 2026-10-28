@@ -11,6 +11,23 @@ export interface BoundaryConfig {
    * 否则会把整文件免检，鉴权面的覆盖一并丢失。
    */
   publicRoutes: { file: string; reason: string; methods?: string[] }[]
+  /**
+   * 幂等证据词表（服务层取证）。入口体没有字面幂等标记时，按「入口调用的一跳服务函数」
+   * 在这些词里找证据：咨询锁 / 唯一键 / CAS / 冲突映射 —— 护闸写在服务层而不是路由里的，
+   * 靠字面标记判定会把真护闸判成「无幂等」。
+   */
+  idempotencyEvidence?: string[]
+  /**
+   * 幂等取证跳数。默认 2（入口 → 服务函数 → 服务内再一跳）；
+   * 0 = 关闭跨文件取证（退回只看入口体字面标记）。
+   */
+  idempotencyDepth?: number
+  /**
+   * 留痕写（审计 / 拒绝路径）函数名，追加在默认词表（`logAccessDeny` / `writeAuditEvent` 等）之上。
+   * 这些函数体内的写不算业务写：多一条 deny 日志不是「重复扣减」；但它们仍是否定
+   * 只读豁免的依据（判 `audit-trace`，不豁免）。
+   */
+  auditWriteCalls?: string[]
 }
 
 export interface StoreConfig {
@@ -137,6 +154,13 @@ export interface QeConfig {
     collector: string
     roots: string[]
     extensions: string[]
+    /**
+     * 根级单文件（相对 root）。框架约定会把关键源码放在仓根（NextAuth v5 的 `auth.ts`、
+     * 部分仓库的 `server.ts`），`roots` 只认目录，这类文件就永远进不了射程 —— 写手
+     * 被判「零写入」、路由面少一块。文件级声明是 roots 的补充，证据纪律同 roots：
+     * 声明的文件必须存在（doctor 校验），解析与判据视同 root 下文件。
+     */
+    files?: string[]
     /**
      * 证据目录：只用于「写入者/枚举使用」取证，不作为应用面扫描。
      * 种子、导入、巡检脚本里的写点是真的写点，但不该把脚本里的路由/客户端判据也算进来。
@@ -321,6 +345,188 @@ export const defaultConfig: QeConfig = {
   rules: {},
 }
 
+/** 配置形状错误：类型不对必须当场拒绝，不能等到守卫拿 `undefined` 去判 */
+export class ConfigShapeError extends Error {
+  readonly issues: string[]
+  constructor(label: string, issues: string[]) {
+    super(`${label} 形状错误：\n  - ${issues.join('\n  - ')}`)
+    this.name = 'ConfigShapeError'
+    this.issues = issues
+  }
+}
+
+type ShapeKind =
+  | { kind: 'string' }
+  | { kind: 'number' }
+  | { kind: 'string[]' }
+  | { kind: 'object' }
+  | { kind: 'objectList'; required: string[]; optionalStringArrays?: string[] }
+
+/**
+ * 需要校验的配置路径。
+ *
+ * 为什么不是「全 schema 校验」：这里只钉**会让判据静默失灵**的形状 ——
+ *   - `boundaries.publicRoutes` 写成字符串数组时，旧代码读 `r.file` 得到 `undefined`，
+ *     公共登记整块失效、文案里还会印出 `undefined`（真实仓实测）；
+ *   - `stores.moduleRoots` / `source.roots` 写成字符串时，`for...of` 会按字符遍历，
+ *     射程变成一堆单字母目录，0 命中后被判绿（D1 的另一种形态）。
+ * 只校验「出现即必须正确」：路径不存在一律放行（缺省值由 defaultConfig 负责）。
+ */
+const SHAPE_RULES: Array<{ path: string; shape: ShapeKind }> = [
+  { path: 'schema', shape: { kind: 'object' } },
+  { path: 'schema.provider', shape: { kind: 'string' } },
+  { path: 'schema.path', shape: { kind: 'string' } },
+  { path: 'schema.clientNames', shape: { kind: 'string[]' } },
+  { path: 'source', shape: { kind: 'object' } },
+  { path: 'source.collector', shape: { kind: 'string' } },
+  { path: 'source.roots', shape: { kind: 'string[]' } },
+  { path: 'source.extensions', shape: { kind: 'string[]' } },
+  { path: 'source.files', shape: { kind: 'string[]' } },
+  { path: 'source.evidenceRoots', shape: { kind: 'string[]' } },
+  { path: 'ignore', shape: { kind: 'string[]' } },
+  { path: 'scriptsDirs', shape: { kind: 'string[]' } },
+  { path: 'addressableLibDirs', shape: { kind: 'string[]' } },
+  { path: 'addressableOrchestratorExts', shape: { kind: 'string[]' } },
+  { path: 'boundaries', shape: { kind: 'object' } },
+  { path: 'boundaries.authPatterns', shape: { kind: 'string[]' } },
+  { path: 'boundaries.validatePatterns', shape: { kind: 'string[]' } },
+  { path: 'boundaries.mutationMethods', shape: { kind: 'string[]' } },
+  { path: 'boundaries.idempotencyEvidence', shape: { kind: 'string[]' } },
+  { path: 'boundaries.auditWriteCalls', shape: { kind: 'string[]' } },
+  { path: 'boundaries.idempotencyDepth', shape: { kind: 'number' } },
+  {
+    path: 'boundaries.publicRoutes',
+    shape: { kind: 'objectList', required: ['file', 'reason'], optionalStringArrays: ['methods'] },
+  },
+  { path: 'stores', shape: { kind: 'object' } },
+  { path: 'stores.moduleRoots', shape: { kind: 'string[]' } },
+  { path: 'stores.sensitiveKeys', shape: { kind: 'string[]' } },
+  { path: 'rules', shape: { kind: 'object' } },
+  // 旧版双份配置键：aq06 从 rules 读词表，inv20 从 boundaries 读。两边都写时容易只改一头。
+  { path: 'rules.aq06', shape: { kind: 'object' } },
+  { path: 'rules.aq06.authPatterns', shape: { kind: 'string[]' } },
+  { path: 'rules.aq06.publicPaths', shape: { kind: 'string[]' } },
+  { path: 'coverage', shape: { kind: 'object' } },
+  { path: 'coverage.uiRoots', shape: { kind: 'string[]' } },
+  { path: 'coverage.uiCorpora', shape: { kind: 'objectList', required: ['name', 'reason'], optionalStringArrays: ['roots', 'extensions'] } },
+  { path: 'coverage.requestCallAdditions', shape: { kind: 'objectList', required: ['pattern', 'reason'] } },
+  { path: 'coverage.dynamicTail', shape: { kind: 'objectList', required: ['endpoint', 'evidence', 'reason'] } },
+  { path: 'coverage.knownNoEntry', shape: { kind: 'objectList', required: ['route', 'reason'] } },
+  { path: 'coverage.externalPrefixes', shape: { kind: 'objectList', required: ['prefix', 'reason'] } },
+  { path: 'spec', shape: { kind: 'object' } },
+  { path: 'spec.docs', shape: { kind: 'string[]' } },
+  { path: 'softDelete', shape: { kind: 'object' } },
+  { path: 'softDelete.tables', shape: { kind: 'string[]' } },
+  { path: 'rateLimit', shape: { kind: 'object' } },
+  { path: 'rateLimit.patterns', shape: { kind: 'string[]' } },
+]
+
+function typeName(value: unknown): string {
+  if (value === null) return 'null'
+  if (Array.isArray(value)) return 'array'
+  return typeof value
+}
+
+function preview(value: unknown): string {
+  const text = JSON.stringify(value)
+  if (text === undefined) return String(value)
+  return text.length > 80 ? text.slice(0, 77) + '…' : text
+}
+
+/** 沿点号路径取值；中间缺失返回 `undefined`（缺省即放行），数组索引不支持 */
+function valueAt(raw: Record<string, unknown>, dotted: string): unknown {
+  let cur: unknown = raw
+  for (const seg of dotted.split('.')) {
+    if (cur === null || typeof cur !== 'object' || Array.isArray(cur)) return undefined
+    cur = (cur as Record<string, unknown>)[seg]
+    if (cur === undefined) return undefined
+  }
+  return cur
+}
+
+function checkShape(pathLabel: string, value: unknown, shape: ShapeKind): string[] {
+  const issues: string[] = []
+  if (!shape || value === undefined) return issues
+  if (shape.kind === 'string') {
+    if (typeof value !== 'string') issues.push(`CONFIG_SHAPE ${pathLabel} 应为 string，实际为 ${typeName(value)}（${preview(value)}）`)
+    return issues
+  }
+  if (shape.kind === 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      issues.push(`CONFIG_SHAPE ${pathLabel} 应为 number，实际为 ${typeName(value)}（${preview(value)}）`)
+    }
+    return issues
+  }
+  if (shape.kind === 'string[]') {
+    if (!Array.isArray(value)) {
+      issues.push(`CONFIG_SHAPE ${pathLabel} 应为 string 数组，实际为 ${typeName(value)}（${preview(value)}）`)
+      return issues
+    }
+    value.forEach((item, i) => {
+      if (typeof item !== 'string') {
+        issues.push(`CONFIG_SHAPE ${pathLabel}[${i}] 应为 string，实际为 ${typeName(item)}（${preview(item)}）`)
+      }
+    })
+    return issues
+  }
+  if (shape.kind === 'object') {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      issues.push(`CONFIG_SHAPE ${pathLabel} 应为对象，实际为 ${typeName(value)}（${preview(value)}）`)
+    }
+    return issues
+  }
+  // objectList
+  if (!Array.isArray(value)) {
+    issues.push(
+      `CONFIG_SHAPE ${pathLabel} 应为对象数组（每项含 ${shape.required.join(' / ')}），实际为 ${typeName(value)}（${preview(value)}）`,
+    )
+    return issues
+  }
+  value.forEach((item, i) => {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) {
+      issues.push(
+        `CONFIG_SHAPE ${pathLabel}[${i}] 应为对象（含 ${shape.required.join(' / ')}），实际为 ${typeName(item)}（${preview(item)}）` +
+          '；字符串数组是旧写法，会被读成 { file: undefined }，整块登记静默失效',
+      )
+      return
+    }
+    const record = item as Record<string, unknown>
+    for (const key of shape.required) {
+      if (typeof record[key] !== 'string') {
+        issues.push(
+          `CONFIG_SHAPE ${pathLabel}[${i}].${key} 应为 string，实际为 ${typeName(record[key])}（${preview(record[key])}）`,
+        )
+      }
+    }
+    for (const key of shape.optionalStringArrays ?? []) {
+      const v = record[key]
+      if (v === undefined) continue
+      if (!Array.isArray(v) || v.some((x) => typeof x !== 'string')) {
+        issues.push(
+          `CONFIG_SHAPE ${pathLabel}[${i}].${key} 应为 string 数组（缺省=整文件公开），实际为 ${typeName(v)}（${preview(v)}）`,
+        )
+      }
+    }
+  })
+  return issues
+}
+
+/**
+ * 配置形状校验的唯一入口。`loadConfig` 与 CLI 的 `--config` overlay 都过这里：
+ * 同一个配置读两次（基线 + 覆盖）却只校验一次，等于给外部配置留了一条绕过形状判据的通道。
+ */
+export function assertConfigShape(raw: unknown, label = 'qe.config.json'): void {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new ConfigShapeError(label, [`CONFIG_SHAPE 根节点应为对象，实际为 ${typeName(raw)}（${preview(raw)}）`])
+  }
+  const record = raw as Record<string, unknown>
+  const issues: string[] = []
+  for (const rule of SHAPE_RULES) {
+    issues.push(...checkShape(rule.path, valueAt(record, rule.path), rule.shape))
+  }
+  if (issues.length > 0) throw new ConfigShapeError(label, issues)
+}
+
 /** 深度合并嵌套配置块（schema/source/systemFields），数组整体替换 */
 export function mergeConfig(base: QeConfig, patch?: Partial<QeConfig>): QeConfig {
   if (!patch) return { ...base }
@@ -344,11 +550,14 @@ export async function loadConfig(root: string): Promise<QeConfig> {
   } catch {
     return withSelfIgnore(root, { ...defaultConfig })
   }
+  let parsed: unknown
   try {
-    return withSelfIgnore(root, mergeConfig(defaultConfig, JSON.parse(raw) as Partial<QeConfig>))
+    parsed = JSON.parse(raw)
   } catch (e) {
     throw new Error(`qe.config.json 解析失败：${(e as Error).message}`)
   }
+  assertConfigShape(parsed, 'qe.config.json')
+  return withSelfIgnore(root, mergeConfig(defaultConfig, parsed as Partial<QeConfig>))
 }
 
 /** copy-in 模式：包目录若在目标仓内，自动排除它，避免扫描到工具本身 */

@@ -46,6 +46,14 @@ export interface RawHit {
 
 export interface RuleCtx {
   root: string
+  /**
+   * 本次运行的完整配置。
+   *
+   * 规则读 `options`（`rules[ruleId]`）解决**本项目特有的词表**；跨规则共享的项目事实
+   * （鉴权词表、公共路由、模块根…）必须读 `config`，与原生守卫同源。否则同一个概念会在
+   * `rules.aq06.authPatterns` 与 `boundaries.authPatterns` 里各存一份，两份迟早不一致。
+   */
+  config: QeConfig
   /** 该规则的选项：`qe.config.json` 的 `rules[ruleId]`（误报只许在这里解决，不许改判据） */
   options: Record<string, unknown>
   facts: SchemaFacts
@@ -142,7 +150,13 @@ function materialize(spec: RuleSpec): GuardCase[] {
   return cases
 }
 
-async function loadFacts(root: string, config: QeConfig): Promise<SchemaFacts> {
+/**
+ * 读 schema 事实（含迁移里的真实唯一索引）。
+ *
+ * 导出理由：原生守卫（如 inv20 的幂等分档）也要同一份事实，
+ * 不许自己再写一遍 prisma 解析 + 迁移扫描——两份解析器的下一站是两份答案。
+ */
+export async function loadSchemaFacts(root: string, config: QeConfig): Promise<SchemaFacts> {
   if (config.schema.provider === 'none') return EMPTY_FACTS
   try {
     const snapshot = await prismaSchemaProvider.load(root, config)
@@ -194,10 +208,11 @@ export function toGuard(spec: RuleSpec): Guard {
     oracle,
     level: spec.level ?? 'error',
     async run(ctx) {
-      const facts = await loadFacts(ctx.root, ctx.config)
+      const facts = await loadSchemaFacts(ctx.root, ctx.config)
       const options = (ctx.config.rules?.[spec.id] ?? {}) as Record<string, unknown>
       const ruleCtx: RuleCtx = {
         root: ctx.root,
+        config: ctx.config,
         options,
         facts,
         // 同步读：规则是纯函数，签名里不该出现 Promise；每规则每文件调用 0~2 次，代价可忽略

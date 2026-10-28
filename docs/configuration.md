@@ -121,6 +121,9 @@ exist means the criterion is judging a void.
 | `authPatterns` | built-in list | Regex-ish tokens that count as an auth check (session lookup, `requireUser`, `auth()`, …) |
 | `validatePatterns` | built-in list | Tokens that count as input validation (`z.object`, `.parse(`, `.safeParse(`, `validate(`, `parseBody`…). `JSON.parse(` is explicitly not a hit |
 | `mutationMethods` | `POST`, `PUT`, `PATCH`, `DELETE` | HTTP methods treated as mutations (auth + validation when the entry reads a request body) |
+| `idempotencyEvidence` | built-in list | Extra tokens that count as server-side idempotency evidence (`pg_advisory`, `.upsert(`, `.updateMany(`, `skipDuplicates`, `P2002`, `ON CONFLICT`, `idempot` are built in). Add repo-specific mechanisms here (e.g. `transition(`, `mapUnique`) |
+| `idempotencyDepth` | `2` | How many hops to follow from the entry into imported service functions when looking for idempotency evidence. `0` disables cross-file evidence (entry-body tokens only) |
+| `auditWriteCalls` | built-in list | Extra names of trace-only helpers (audit / deny-path logging; `logAccessDeny`, `writeAuditEvent`, `recordAuditEvent`, `appendAudit`, `logAccess` are built in). Writes inside these bodies are not business writes — a second denial log is not a duplicated side effect — so they are split into the `audit-trace` bucket instead of the duplicate-risk buckets. They still prevent the `MUTATION_READONLY` exemption: a trace write is a write, and only a human can confirm there is no business write |
 | `publicRoutes` | `[]` | `{ "file": "app/api/health/route.ts", "reason": "liveness probe, read-only" }[]` |
 
 Backs `INV-WEB-01…04`. Three rules that are easy to get wrong:
@@ -132,7 +135,14 @@ Backs `INV-WEB-01…04`. Three rules that are easy to get wrong:
    (`request.json()` / `formData()` / `text()`); `DELETE` and action-style `POST` without a body have no input
    to validate. A same-file helper called from the entry can prove validation (one hop); cross-file helpers
    downgrade the finding to `VALIDATE_NOT_PROVEN` (warn). Idempotency keys are required for `POST`/`PUT`/`PATCH`
-   only — `DELETE` is idempotent by definition.
+   only — `DELETE` is idempotent by definition. An entry whose resolvable scope (entry body + same-file helpers +
+   imported service functions, bounded by `idempotencyDepth`) contains **no write call at all** — including no
+   trace-only write — is reported as info `MUTATION_READONLY` instead of a warning; a read-only entry has no second
+   side effect to dedupe. When the only visible write is a trace write (`auditWriteCalls`), the finding stays a
+   warning but its triage tier becomes `audit-trace`.
+   Unresolvable local imports, namespace imports (`import * as svc`) and an exhausted depth all keep the warning:
+   an exemption has to be proven, never assumed. Third-party packages (`next/headers`, `zod`) do not count as
+   "unresolvable" — they are outside the scan tree by definition.
 
 ### `stores` — client state boundaries
 

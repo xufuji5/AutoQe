@@ -14,7 +14,8 @@ import { hasUniqueOver, parseMigrationUniqueIndexes } from './schema-facts.ts'
 import { currentCounts, guardOf, splitByCoverage } from './ratchet.ts'
 import { resolveReportDir } from './report-path.ts'
 import { stateFilesInIndex } from './repo-hygiene.ts'
-import { defaultConfig } from './config.ts'
+import { defaultConfig, assertConfigShape, mergeConfig } from './config.ts'
+import { allMethodsDeclaredPublic, authVocabulary, routePathCovers } from './auth-evidence.ts'
 
 const tableToModel = new Map([
   ['User', 'User'],
@@ -101,6 +102,93 @@ export const ENGINE_SELFTEST: SelfCase[] = (() => {
       noReport: true,
     }) === null,
   )
+
+  // ── 配置形状：类型错了必须当场拒绝，不能等守卫拿 undefined 去判 ────────────
+  // 反证形态（真实仓实测）：`publicRoutes` 写成字符串数组后，`r.file` 读出 undefined，
+  // 公共登记整块静默失效（该免检的端点被报裸奔、公共登记过期判定永远为真），
+  // 而读数上看不出任何异常 —— 只有形状判据能把它变成一条可寻址的 FAIL。
+  {
+    const shapeIssues = (raw: unknown): string[] => {
+      try {
+        assertConfigShape(raw, 'selftest')
+        return []
+      } catch (e) {
+        return ((e as { issues?: string[] }).issues ?? []) as string[]
+      }
+    }
+    const stringRouteIssues = shapeIssues({ boundaries: { publicRoutes: ['app/api/health/route.ts'] } })
+    push(
+      '配置形状：publicRoutes 写成字符串数组必须拒绝（会读成 { file: undefined }）',
+      stringRouteIssues.some((s) => s.includes('boundaries.publicRoutes[0]')),
+      stringRouteIssues,
+    )
+    push(
+      '配置形状：publicRoutes 对象数组（file+reason）必须放行',
+      shapeIssues({ boundaries: { publicRoutes: [{ file: 'app/api/health/route.ts', reason: '探活' }] } }).length === 0,
+    )
+    push(
+      '配置形状：publicRoutes 缺 reason 必须拒绝（空理由不是豁免，是漏判）',
+      shapeIssues({ boundaries: { publicRoutes: [{ file: 'app/api/health/route.ts' }] } }).some((s) =>
+        s.includes('publicRoutes[0].reason'),
+      ),
+    )
+    push(
+      '配置形状：moduleRoots 写成字符串必须拒绝（for...of 会按字符遍历，射程变单字母目录）',
+      shapeIssues({ stores: { moduleRoots: 'src' } }).some((s) => s.includes('stores.moduleRoots')),
+    )
+    push('配置形状：未出现的块一律放行（缺省值由 defaultConfig 负责）', shapeIssues({}).length === 0)
+    push(
+      '配置形状：每条拒绝都带 CONFIG_SHAPE 前缀（可定位、可分类）',
+      shapeIssues({ stores: { moduleRoots: 'src' } }).every((s) => s.startsWith('CONFIG_SHAPE ')),
+    )
+  }
+
+  // ── 鉴权词表单源：aq06 与 inv20 必须给出同一个答案 ──────────────────────────
+  // 反证形态（真实仓实测）：两条守卫各读一份配置，于是同一条路由按 aq06 算公开、
+  // 按 inv20 算裸奔；人要同时相信两个互相矛盾的读数，最后只能关掉其中一个。
+  {
+    const legacyOnly = authVocabulary(
+      mergeConfig(defaultConfig, {
+        rules: { aq06: { authPatterns: ['legacyAuth'], publicPaths: ['app/api/health'] } },
+      }),
+    )
+    push(
+      '鉴权词表：未写 boundaries 时回落 rules.aq06（老配置不强制迁移）',
+      legacyOnly.patterns[0] === 'legacyAuth' && legacyOnly.publicRoutes[0]?.file === 'app/api/health',
+      legacyOnly,
+    )
+    const both = authVocabulary(
+      mergeConfig(defaultConfig, {
+        boundaries: { authPatterns: ['boundaryAuth'], publicRoutes: [{ file: 'app/api/x/route.ts', reason: '探活' }] },
+        rules: { aq06: { authPatterns: ['legacyAuth'], publicPaths: ['app/api/health'] } },
+      }),
+    )
+    push(
+      '鉴权词表：boundaries 与 rules.aq06 同时存在时只认 boundaries（同一事实不许两个答案）',
+      both.patterns[0] === 'boundaryAuth' && both.publicRoutes[0]?.file === 'app/api/x/route.ts',
+      both,
+    )
+    const badShape = authVocabulary(
+      mergeConfig(defaultConfig, {
+        boundaries: { publicRoutes: ['app/api/x'] as unknown as { file: string; reason: string }[] },
+      }),
+    )
+    push(
+      '鉴权词表：字符串形状的登记项被丢弃（形状错误交给 CONFIG_SHAPE，不许静默当登记）',
+      badShape.publicRoutes.length === 0,
+      badShape.publicRoutes,
+    )
+    push(
+      '路由前缀：app/api/auth/ 不命中 app/api/auth-evil/route.ts（裸 startsWith 是假绿锚点）',
+      !routePathCovers('app/api/auth/', 'app/api/auth-evil/route.ts'),
+    )
+    push(
+      '按方法登记：methods=[GET] 不得放开同文件的 POST（整文件豁免会丢掉鉴权面）',
+      !allMethodsDeclaredPublic('app/api/mixed/route.ts', ['GET', 'POST'], [
+        { file: 'app/api/mixed/route.ts', methods: ['GET'] },
+      ]),
+    )
+  }
 
   // ── ratchet 覆盖切分：未测 ≠ 修好 ───────────────────────────────────────────
   // 反证形态：`--only inv13` 只跑一个守卫时，基线里别的键必须落进 unverified，

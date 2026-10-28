@@ -1,0 +1,7 @@
+{
+  "name": "authjs-no-adapter-fixture",
+  "private": true,
+  "dependencies": {
+    "@prisma/client": "^6.0.0"
+  }
+}

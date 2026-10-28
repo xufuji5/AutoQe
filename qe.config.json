@@ -20,6 +20,9 @@
   "boundaries": {
     "publicRoutes": []
   },
+  "stores": {
+    "moduleRoots": ["qe/demo/src"]
+  },
   "scriptsDirs": ["scripts"],
   "guardsDir": "qe/guards",
   "packageJson": "package.json",

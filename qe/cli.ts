@@ -2,7 +2,7 @@
 import path from 'node:path'
 import { existsSync } from 'node:fs'
 import { spawn } from 'node:child_process'
-import { loadConfig, mergeConfig, type QeConfig } from './lib/config.ts'
+import { assertConfigShape, loadConfig, mergeConfig, type QeConfig } from './lib/config.ts'
 import { readTextSafe, walkFiles } from './lib/fs.ts'
 import { registry } from './registry/registry.ts'
 import { guards } from './guards/index.ts'
@@ -137,6 +137,9 @@ async function currentConfig(): Promise<Awaited<ReturnType<typeof loadConfig>>> 
   } catch (e) {
     throw new Error(`--config 文件解析失败：${override}：${(e as Error).message}`)
   }
+  // 外部覆盖同样过形状判据：否则「基线配置校验、覆盖配置不校验」,
+  // 一个形状错误的 --config 能把公共路由登记整块静默关掉（真实仓实测）。
+  assertConfigShape(parsed, `--config ${override}`)
   configFilePath = override
   const config = mergeConfig(base, parsed)
   // 隔离硬门：状态根身份（外部状态不许跨项目复用）+ 配置声明的路径围栏。
@@ -324,7 +327,46 @@ async function cmdDoctor(): Promise<void> {
     sourceTotal += files.length
     rows.push(`${files.length > 0 ? 'OK  ' : 'WARN'} source ${dir} files=${files.length}`)
   }
+  // source.files 是根级单文件声明：声明了就必须存在，否则是射程里的静默空洞
+  for (const f of config.source.files ?? []) {
+    if (!existsSync(path.resolve(root, f))) {
+      rows.push(`FAIL source file ${f} missing -> fix source.files in qe.config.json`)
+      continue
+    }
+    sourceTotal += 1
+    rows.push(`OK   source file ${f}`)
+  }
   rows.push(`${sourceTotal > 0 ? 'OK  ' : 'WARN'} source total=${sourceTotal} files (collector=${config.source.collector})`)
+
+  // stores.moduleRoots 是 inv21 的射程：解析到 0 个模块时守卫会显式 skipped，
+  // 读数看上去「变好」了（少了噪声），实际是整片接缝面没被检查 —— doctor 必须说出来。
+  const moduleRoots = config.stores?.moduleRoots ?? []
+  if (moduleRoots.length === 0) {
+    rows.push('WARN stores.moduleRoots=none -> inv21 will be skipped (declare module boundary dirs, e.g. ["src/features","src/modules"])')
+  } else {
+    let moduleFiles = 0
+    for (const dir of moduleRoots) {
+      if (!existsSync(path.resolve(root, dir))) {
+        rows.push(`WARN stores.moduleRoots ${dir} missing`)
+        continue
+      }
+      moduleFiles += (await walkFiles(root, dir, { ignore: config.ignore, ext: config.source.extensions })).length
+    }
+    rows.push(
+      `${moduleFiles > 0 ? 'OK  ' : 'WARN'} stores.moduleRoots=${moduleRoots.join(',')} files=${moduleFiles}` +
+        `${moduleFiles === 0 ? ' -> inv21 will be skipped (0 modules = empty set, never green)' : ''}`,
+    )
+  }
+
+  // 双份配置键：鉴权词表只认 boundaries.*（规则层与原生守卫共用 lib/auth-evidence.ts）。
+  // 两边都写时改一头忘一头，读数会随「谁先读」变 —— 这不是可选项，是缺陷源头。
+  const legacyAq06 = (config.rules?.['aq06'] ?? {}) as Record<string, unknown>
+  if (Array.isArray(config.boundaries?.authPatterns) && Array.isArray(legacyAq06.authPatterns)) {
+    rows.push('WARN config boundaries.authPatterns 与 rules.aq06.authPatterns 同时存在 -> 双份维护；词表只认 boundaries.*，请删掉 rules.aq06.*')
+  }
+  if (Array.isArray(config.boundaries?.publicRoutes) && Array.isArray(legacyAq06.publicPaths)) {
+    rows.push('WARN config boundaries.publicRoutes 与 rules.aq06.publicPaths 同时存在 -> 双份维护；请只保留 boundaries.publicRoutes（对象数组，带 reason）')
+  }
 
   const evidenceDirs = config.source.evidenceRoots ?? []
   if (evidenceDirs.length === 0) {
