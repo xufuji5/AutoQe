@@ -119,6 +119,29 @@ export const RULE_ORACLES: Record<string, RuleOracle> = {
     guardedBy: ['INV-DB-04'],
   },
 
+  /* ---------- AQ016–AQ018：假闸门 / 假出网 / 假数据兜底 ---------- */
+  aq16: {
+    source:
+      '函数声明的语法形态：函数名动词前缀 × 形参清单 × 函数体首个有效语句是否为字面量 true 或 `{ ok: true }` × ' +
+      '函数体是否出现任何一个形参名（四项都由源码直接复算，不需要理解业务）',
+    kind: 'machine',
+    guardedBy: ['INV-RES-04'],
+  },
+  aq17: {
+    source:
+      '脚本文件的静态 import 说明符（是否引入强制 mock 环境模块）× 出网调用点第一实参的字符串字面量' +
+      '（绝对 http(s) 且主机非本机 = external，变量/模板 = unknown，相对地址与本机主机 = local）',
+    kind: 'machine',
+    guardedBy: ['INV-RES-03'],
+  },
+  aq18: {
+    source:
+      'if 判定条件文本是否命中 dev 门控词表 × 分支体（含 catch 体）内 return 的常量数据字面量：' +
+      '数组元素数 / 单条记录字段数 / 对象键数与数据字段都可直接计数',
+    kind: 'machine',
+    guardedBy: ['INV-RES-05'],
+  },
+
   /* ---------- MP001–MP008：小程序域（宿主时序/样式作用域/配置表） ---------- */
   mp01: {
     source: '定时器回调体的 AST × 页面/组件生命周期钩子（onUnload/detached）与存活短路的出现位置',

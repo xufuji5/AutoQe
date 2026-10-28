@@ -1308,6 +1308,34 @@ export const POLICIES: Record<string, Policy> = {
       L('B Legitimate constant: record it with a reason + review date', 'B 合法常量：备案理由与复审日期'),
     ],
   },
+  ENTRY_UI_DYNAMIC_TAIL: {
+    disposition: 'decide',
+    impact: 'trace',
+    effort: 'S',
+    meaning: L(
+      'The last path segment of a server entry is decided by a variable on the caller side, so the static prefix is all the evidence there is: either register coverage.dynamicTail, or make the call provable.',
+      '服务端入口的末段在调用侧由变量决定，静态只能证到前缀：要么登记 coverage.dynamicTail 举证，要么让调用点可静态证明。',
+    ),
+    action: L('Register the dynamic tail with evidence, or fix the call site.', '登记动态末段与证据，或修好调用点。'),
+    options: [
+      L('A Register coverage.dynamicTail with evidence (recommended)', 'A 登记 coverage.dynamicTail 并附证据（推荐）'),
+      L('B Fix the call site so the endpoint is statically provable', 'B 修调用点，让端点可静态证明'),
+    ],
+  },
+  AQ15_NO_EFFECTIVE_FILES: {
+    disposition: 'decide',
+    impact: 'trace',
+    effort: 'S',
+    meaning: L(
+      'Every scanned file is below the effective-line threshold, so the duplicate-block check saw no content: this reading is not "clean".',
+      '扫描到的文件全部低于有效行门槛，重复块判据实际没扫到内容：这个读数不是「干净」。',
+    ),
+    action: L('Fix source.roots / thresholds, or declare this repo has no long-file duplication risk.', '修正 source.roots 或门槛，或声明本仓没有长文件重复风险。'),
+    options: [
+      L('A Fix source.roots so long files enter the scope (recommended)', 'A 修正 source.roots，让长文件进入射程（推荐）'),
+      L('B This repo has no long files — lower the threshold or turn the check off', 'B 本仓确实没有长文件 → 调低门槛或显式关掉本判据'),
+    ],
+  },
 }
 
 const UNKNOWN_POLICY: Policy = {

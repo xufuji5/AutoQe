@@ -505,6 +505,40 @@ export const registry: Invariant[] = [
     decidedAt: '2026-10-25',
   },
 
+  {
+    id: 'INV-RES-03',
+    statement: '自测/冒烟脚本不得在未强制 mock 环境的情况下调用真实外部接口（本机与相对地址除外）',
+    defectClasses: ['测试方法论', '防线幻觉'],
+    guard: 'qe:guard:aq17',
+    badSample: 'qe/rules/AQ017-script-outbound-unmocked.ts 的 fixtures（脚本直连支付网关 / 地址来自变量 / 引入支付 SDK 未 mock）',
+    status: 'partial',
+    gap:
+      '射程只到 `scripts|tools|ci` 下、文件名以自测动词开头的文件；「强制 mock」只认 import 说明符含 `force-mock-env`（可用 rules.aq17.mockEnvImport 改）；项目自封装客户端、经服务模块间接出网、运行时改动 env 不可见；地址为变量时按 unknown 报，不做运行期验证',
+    decidedAt: '2026-10-28',
+  },
+  {
+    id: 'INV-RES-04',
+    statement: '名为 verify/check/validate 的函数，不得在完全不读入参的情况下恒返回通过',
+    defectClasses: ['防线幻觉', '建了没接线'],
+    guard: 'qe:guard:aq16',
+    badSample: 'qe/rules/AQ016-verify-always-true.ts 的 fixtures（短信二次验证首行 return { ok: true } / 权限校验 return true）',
+    status: 'partial',
+    gap:
+      '只认函数声明与 `const x = (…) =>` 两种载体；零参函数不报（探活合法）；函数体读任一形参即放过（不评价校验强度）；先做无关赋值再读入参的写法、对象/类方法、跨文件调用关系不在射程',
+    decidedAt: '2026-10-28',
+  },
+  {
+    id: 'INV-RES-05',
+    statement: 'dev 门控或异常兜底分支不得直接返回写死的业务数据（空值与明确错误结构除外）',
+    defectClasses: ['隐性陷阱', '建了没接线', '证据不足'],
+    guard: 'qe:guard:aq18',
+    badSample: 'qe/rules/AQ018-dev-gate-data-fallback.ts 的 fixtures（dev 门控返回示例列表 / catch 返回写死记录）',
+    status: 'partial',
+    gap:
+      '只认 `if (<dev 门控>)` 与 `catch { … }` 两种载体（三元 / ?? / || / switch 不可见）；门控词表有限，自定义环境变量不认；只出 warn 候选——「这份数据是不是故意留的」仍需人裁决；不做运行期数据流',
+    decidedAt: '2026-10-28',
+  },
+
   /* ---------- 缺失族：规格 → 实现对账（AQ-ABS） ---------- */
   {
     id: 'INV-SPEC-01',

@@ -181,6 +181,24 @@ substrings (`tenant` inside a sentence never becomes a model; `enant` never beco
 Output is capped: at most 10 gaps are listed, plus one `SPEC_GAP_TRUNCATED` note. Sixty-five "missing models" is
 a stale spec baseline, not sixty-five defects — align the baseline first, then triage what remains.
 
+### `rules` — per-rule options (false-positive suppression only)
+
+Pure-function rules read `rules[ruleId]`, never global knobs. The bucket is opt-in: a rule that finds no
+options uses its built-in defaults. Options exist to describe project vocabulary (a house mock module, an
+extra outbound SDK), never to loosen a criterion — if a reading is wrong, fix the rule, not this table.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `rules.aq17.mockEnvImport` | `["force-mock-env"]` | Import specifiers that prove a self-test script has forced a mock environment. Any match in an `import` / `require` specifier exempts the file |
+| `rules.aq17.outboundImports` | `[]` | Extra package specifiers treated as real outbound capability (beyond the built-in payment SDK list). Substring match, so `@acme/sms-client` covers its subpaths |
+| `rules.aq16`, `rules.aq18` | — | No options: both criteria are fact-shaped (`params never read`, `literal data in a dev gate`). A false positive is a rule defect, not a vocabulary gap |
+| `rules.aq09.uniqueWrites` | unset (guard reports `skipped`) | Declared single-write entries; without it the dedupe-key check has no oracle |
+| `rules.mp*.mpRoots` | auto-discovery | Mini-program roots when `app.json` is not in a default location |
+
+```json
+"rules": { "aq17": { "mockEnvImport": ["offline-gateway"], "outboundImports": ["@acme/sms-client"] } }
+```
+
 ### Repo-plumbing fields
 
 | Field | Default | Meaning |

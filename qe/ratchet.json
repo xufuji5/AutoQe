@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-28T00:39:32.100Z",
+  "updatedAt": "2026-10-28T03:23:10.258Z",
   "counts": {
     "inv23-entry-channel:SKIP:NO_ROUTE_FILES": 1,
     "inv25-soft-delete-read:SKIP:SOFTDELETE_UNDECLARED": 1,
@@ -12,6 +12,7 @@
     "iso01-vendored-engine:SKIP:NO_VENDORED_ENGINE": 1,
     "aq09:SKIP:UNIQUE_WRITES_UNSET": 1,
     "aq15:AQ15_NO_EFFECTIVE_FILES": 1,
+    "aq17:SKIP:SCOPE_ZERO_FILES": 1,
     "mp01:SKIP:MP_PROJECT_NOT_FOUND": 1,
     "mp02:SKIP:MP_PROJECT_NOT_FOUND": 1,
     "mp03:SKIP:MP_PROJECT_NOT_FOUND": 1,
