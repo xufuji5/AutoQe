@@ -203,7 +203,7 @@ extra outbound SDK), never to loosen a criterion — if a reading is wrong, fix 
 
 | Field | Default | Meaning |
 |---|---|---|
-| `scriptsDirs` | `["scripts"]` | Where guard scripts live, used by `inv13` |
+| `scriptsDirs` | `["scripts"]` | Where guard scripts live: `inv13` checks them, and `aq17` scans self-test scripts there even when `source.roots` does not include the directory |
 | `guardsDir` | `qe/guards` | Where local guards live, used by `inv13` |
 | `packageJson` | `package.json` | Manifest checked for guard aliases (`inv13`) |
 | `ledger` | `qe/ledger/incidents.json` | Incident ledger read by the report |

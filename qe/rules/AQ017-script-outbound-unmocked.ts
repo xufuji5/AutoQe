@@ -38,7 +38,7 @@
  * 在脚本**第一行**（早于任何业务 import 的副作用）引入强制 mock 环境模块，
  * 由它把所有网关地址/密钥切到桩；或把地址改成显式参数并默认本机。
  */
-import { argSpanAt, matchDelimiter, maskStringBodies, stripComments } from '../lib/code-only.ts'
+import { argSpanAt, escapeRe, matchDelimiter, maskStringBodies, stripComments } from '../lib/code-only.ts'
 import { evidenceOf, lineOf } from '../lib/rule-helpers.ts'
 import { toGuard, type RawHit, type RuleCtx } from '../lib/rule-guard.ts'
 
@@ -61,12 +61,64 @@ const LOCAL_HOST = /^(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|::1)(?::\d+)?$
 /** 相对地址（`/api/x`）打的是自身服务 */
 const RELATIVE = /^\//
 
+/** 地址字面量里的本机主机（含 `||` 默认值：`process.env.X || 'http://localhost:3001'`） */
+const LOCAL_LITERAL = /(?:^|[^\w.-])(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?/i
+const EXTERNAL_LITERAL = /https?:\/\/([^/'"`\s]+)/i
+
+/** 保留/不可路由域名：请求必然失败在解析阶段，不产生外部副作用 */
+const NON_ROUTABLE = /(?:^|\.)(?:example\.(?:com|net|org)|invalid|test)$/i
+
 function isLocalHost(host: string): boolean {
   return LOCAL_HOST.test(host.trim())
 }
 
-/** 从调用实参判断地址归属：local = 可证本机/相对；external = 可证外网；unknown = 看不清 */
-function addressClass(arg: string): 'local' | 'external' | 'unknown' {
+/** 打这个主机不会产生真实外部副作用（本机或保留域名） */
+function noSideEffect(host: string): boolean {
+  const h = host.trim()
+  return isLocalHost(h) || NON_ROUTABLE.test(h)
+}
+
+/**
+ * 同文件一跳解析：`const BASE = …` / `let BASE = …`。
+ *
+ * 冒烟脚本普遍写成 `const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3001'`，
+ * 直接把「地址是变量」判成外部会在每个真实仓里刷出几十条误报。
+ * 只做一跳：找不到声明就返回 null（看不清 → unknown）。
+ */
+function declaredInit(code: string, name: string): string | null {
+  const re = new RegExp(`\\b(?:const|let|var)\\s+${escapeRe(name)}\\s*(?::[^=\\n]+)?=\\s*([^\\n;]*)`)
+  const m = re.exec(code)
+  return m ? m[1] : null
+}
+
+/** 表达式里是否出现本机/外部字面量；两者都没有 = 看不清 */
+function literalClass(expr: string): 'local' | 'external' | 'unknown' {
+  if (LOCAL_LITERAL.test(expr)) return 'local'
+  const ext = EXTERNAL_LITERAL.exec(expr)
+  if (ext) return noSideEffect(ext[1]) ? 'local' : 'external'
+  return 'unknown'
+}
+
+/** 从实参里的标识符追声明，判断它最终指向哪里（最多三跳，防环） */
+function traceClass(code: string, arg: string, depth = 0): 'local' | 'external' | 'unknown' {
+  let out: 'local' | 'external' | 'unknown' = 'unknown'
+  for (const name of arg.match(/[A-Za-z_$][\w$]*/g) ?? []) {
+    const init = declaredInit(code, name)
+    if (init === null) continue
+    const cls = literalClass(init)
+    if (cls === 'local') return 'local'
+    if (cls === 'external') out = 'external'
+    else if (depth < 3) {
+      const sub = traceClass(code, init, depth + 1)
+      if (sub === 'local') return 'local'
+      if (sub === 'external') out = 'external'
+    }
+  }
+  return out
+}
+
+/** 从调用实参判断地址归属：local = 可证本机/相对/保留域名；external = 可证外网；unknown = 看不清 */
+function addressClass(arg: string, code: string): 'local' | 'external' | 'unknown' {
   const t = arg.trim()
   const lit = /^(['"])([\s\S]*?)\1$/.exec(t)
   if (lit) {
@@ -74,15 +126,21 @@ function addressClass(arg: string): 'local' | 'external' | 'unknown' {
     if (RELATIVE.test(url)) return 'local'
     const host = /^https?:\/\/([^/?#]+)/i.exec(url)
     if (!host) return 'unknown'
-    return isLocalHost(host[1]) ? 'local' : 'external'
+    return noSideEffect(host[1]) ? 'local' : 'external'
   }
   const tpl = /^`([\s\S]*?)`$/.exec(t)
   if (tpl) {
     const host = /^https?:\/\/([^/`]*)/i.exec(tpl[1])
-    if (host && !host[1].includes('${')) return isLocalHost(host[1]) ? 'local' : 'external'
-    return 'unknown'
+    if (host) {
+      const h = host[1]
+      if (noSideEffect(h)) return 'local'
+      // 主机里含 `${bucket}.cos.${region}.vendor.com` 这类片段：去掉变量后仍能看出公网域名后缀
+      const literalPart = h.replace(/\$\{[^}]*\}/g, '').trim()
+      if (/\.[a-z]{2,}(?::\d+)?$/i.test(literalPart)) return 'external'
+    }
+    return traceClass(code, tpl[1])
   }
-  return 'unknown'
+  return traceClass(code, t)
 }
 
 /** 取 import / require / 动态 import 的说明符（注释里的伪 import 不算；同一行的 import/from 只算一次） */
@@ -115,10 +173,11 @@ export const aq17 = toGuard({
   invariants: ['INV-RES-03'],
   code: 'AQ017_SCRIPT_OUTBOUND_UNMOCKED',
   blindSpots: [
-    '只扫 `scripts/`、`tools/`、`ci/` 下、文件名以自测动词开头的文件；其它脚本里的真实出网不在射程',
+    '射程 = `source.roots` ∪ `scriptsDirs` 下、文件名以自测动词开头的文件；其它位置的脚本不扫',
     '「强制 mock」只认 import 说明符包含 `force-mock-env`（或配置的模块名）：脚本自行修改 `process.env`、由 npm script 预置环境变量、或经 wrapper 间接生效的 mock 不可见',
     '出网调用只认 `fetch` / `axios` / `https.request` 与支付类 SDK 的顶层 import：项目自封装的 `payClient.transfer()`、经服务模块间接出网不可见',
-    '地址是变量/函数返回值时按 unknown 报（宁可多报一条，也不把真出网当本机）；`http://` 字面量主机解析只做字符串判断',
+    '地址是变量时只做**同文件一跳**声明解析（`const BASE = process.env.X || "http://127.0.0.1:3001"` 判本机）；跨文件、环境注入、函数返回的地址按 unknown 报',
+    '地址是变量/函数返回值且一跳内看不到任何主机字面量时按 unknown 报（宁可多报一条，也不把真出网当本机）；`http://` 字面量主机解析只做字符串判断',
     '本地 dev server 与相对地址一律放过：那是正确用法，不是外部副作用',
     '不做运行期验证：本规则证明「代码里没有强制 mock 的入口」，不证明跑起来一定不出网',
   ],
@@ -134,6 +193,11 @@ export const aq17 = toGuard({
     if (!/(^|\/)(?:scripts|tools|ci)\//.test(rel)) return false
     const base = (rel.split('/').pop() ?? '').replace(/\.\w+$/, '')
     return SELF_TEST_NAME.test(base)
+  },
+  /** 自测脚本按定义不在源码树里：射程补上 `scriptsDirs`（默认 `scripts`），其它规则不受影响 */
+  extraRoots(ctx) {
+    const dirs = ctx.config.scriptsDirs ?? ['scripts']
+    return dirs.filter((d) => typeof d === 'string' && d !== '' && !d.includes('..'))
   },
   analyze(src, _rel, ctx: RuleCtx): RawHit[] {
     const code = stripComments(src)
@@ -172,7 +236,7 @@ export const aq17 = toGuard({
         // 实参取**原文**（要读字符串字面量的内容），结构位置取掩码面（字符串里的逗号不切分）
         const arg = argSpanAt(masked, open, 0)
         if (arg === null) continue
-        const cls = addressClass(code.slice(open + 1, open + 1 + arg.length))
+        const cls = addressClass(code.slice(open + 1, open + 1 + arg.length), code)
         if (cls === 'local') continue
         if (seen.has(m.index)) continue
         seen.add(m.index)
@@ -235,6 +299,41 @@ export const aq17 = toGuard({
       src:
         "export const res = await fetch('http://127.0.0.1:3000/api/admin/gate', { method: 'POST' })\n" +
         "export const rel = await fetch('/api/health')\n",
+    },
+    {
+      name: '本机地址由变量提供、默认值含本机主机（不该报）：真实仓 72 条误报的固化样本',
+      expect: 'green',
+      rel: 'scripts/smoke-skin-test-limit.ts',
+      src:
+        "const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3001'\n" +
+        'const res = await fetch(`${BASE}/api/records`)\n' +
+        'export const json = await res.json()\n',
+    },
+    {
+      name: '地址经两层变量最终落到本机（不该报）：`const url = `${BASE}/…``',
+      expect: 'green',
+      rel: 'scripts/smoke-feed.ts',
+      src:
+        "const BASE = process.env.SMOKE_BASE || 'http://127.0.0.1:3001'\n" +
+        'export async function probe() {\n' +
+        '  const url = `${BASE}/api/feed?limit=10`\n' +
+        '  return fetch(url)\n' +
+        '}\n',
+    },
+    {
+      name: '保留域名（不该报）：解析阶段就失败，没有外部副作用',
+      expect: 'green',
+      rel: 'scripts/smoke-dependency-fault.ts',
+      src: "await fetch('https://not-declared.example.invalid/probe')\n",
+    },
+    {
+      name: '模板主机去掉变量后仍是公网域名（该报）：真实对象存储',
+      expect: 'red',
+      rel: 'scripts/smoke-aftersale-cleanup.ts',
+      src:
+        "const bucket = process.env.ASSET_BUCKET\n" +
+        'const origin = `https://${bucket}.blob.cdn-endpoint.net`\n' +
+        'await fetch(`${origin}/probe.jpg`, { method: "DELETE" })\n',
     },
     {
       name: '配置了项目自己的 mock 模块名（不该报）',

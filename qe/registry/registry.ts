@@ -513,7 +513,7 @@ export const registry: Invariant[] = [
     badSample: 'qe/rules/AQ017-script-outbound-unmocked.ts 的 fixtures（脚本直连支付网关 / 地址来自变量 / 引入支付 SDK 未 mock）',
     status: 'partial',
     gap:
-      '射程只到 `scripts|tools|ci` 下、文件名以自测动词开头的文件；「强制 mock」只认 import 说明符含 `force-mock-env`（可用 rules.aq17.mockEnvImport 改）；项目自封装客户端、经服务模块间接出网、运行时改动 env 不可见；地址为变量时按 unknown 报，不做运行期验证',
+      '射程 = `source.roots` ∪ `scriptsDirs`（默认 `scripts`），且文件名以自测动词开头；「强制 mock」只认 import 说明符含 `force-mock-env`（可用 rules.aq17.mockEnvImport 改）；项目自封装客户端、经服务模块间接出网、运行时改动 env 不可见；地址为变量时只做同文件多跳声明解析，解析不出主机字面量按 unknown 报；不做运行期验证',
     decidedAt: '2026-10-28',
   },
   {

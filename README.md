@@ -1,4 +1,4 @@
-# AutoQe
+﻿# AutoQe
 
 **Quality engineering for AI-assisted development: turn "rules people are supposed to remember" into
 checks that go red on every run. Invariants first, test cases second.**
@@ -38,9 +38,9 @@ Four rules make it more than a pile of regexes:
 3. **No vacuous green** — a guard that cannot see its subject reports `skipped`, never "0 findings".
 4. **Ratchet** — counts per `guard:finding` are frozen and may only go down; a regression fails CI.
 
-Contains 59 invariants (20 `enforced` / 36 `partial` / 3 `open`), 44 guards (15 `inv` + 17 `aq` + 8 `mp` +
-spec reconciliation + leak + isolation), 25 pure-function rules, 42 incident-backed knowledge entries and
-464 self-test cases. Every rule records the real incident it came from; `open` gaps are listed, not hidden.
+Contains 59 invariants (20 `enforced` / 36 `partial` / 3 `open`), 44 guards (15 `inv` + 18 `aq` + 8 `mp` +
+spec reconciliation + leak + isolation), 25 pure-function rules, 43 incident-backed knowledge entries and
+468 self-test cases. Every rule records the real incident it came from; `open` gaps are listed, not hidden.
 
 ## Requirements
 
@@ -116,23 +116,22 @@ readings embedded.
 ```bash
 npm install
 node qe/cli.ts init
-npm run qe:selftest   # 464 case-level self-checks
+npm run qe:selftest   # 468 case-level self-checks
 npm run qe            # guards + ratchet comparison
 ```
 
 Expected reading:
 
 ```text
-SELFTEST_RESULT cases=464 passed=464 failed=0 status=green
-QE_RESULT guards=44 errors=0 warnings=3 skipped=16 status=yellow
-RATCHET status=ok regressions=0 improvements=0 unverified=0 tracked=19 new=0 skips=16
+SELFTEST_RESULT cases=468 passed=468 failed=0 status=green
+QE_RESULT guards=44 errors=0 warnings=3 skipped=15 status=yellow
+RATCHET status=ok regressions=0 improvements=0 unverified=0 tracked=18 new=0 skips=15
 ```
 
-`skipped=16` is honest, not a failure: `inv23` needs Next.js `api/**/route.*` files, `inv25` / `inv27` /
+`skipped=15` is honest, not a failure: `inv23` needs Next.js `api/**/route.*` files, `inv25` / `inv27` /
 `inv28` need declared project facts (`softDelete.tables`, `build.command`, `rateLimit.patterns`), `aq09`
-needs a declared unique-write entry, `aq17` needs self-test scripts under `scripts/` (this repo scans
-`qe/demo/src` only), the eight `mp*` guards need a mini-program root (`app.json`), `spec-abs` needs
-`spec.docs`, and `iso01` only applies when the engine is vendored inside the audited root.
+needs a declared unique-write entry, the eight `mp*` guards need a mini-program root (`app.json`),
+`spec-abs` needs `spec.docs`, and `iso01` only applies when the engine is vendored inside the audited root.
 
 ## Commands
 
@@ -247,7 +246,7 @@ AutoQe 是「不变量优先」的质量工程工具：它不跑测试，而是�
 （零写/零读列、没有界面入口的端点、永不失败的断言、只在作者机器上能构建的 HEAD、软删表漏谓词等）。
 
 - **59 条不变量**（20 enforced / 36 partial / 3 open）、**44 个守卫**、**25 条纯函数规则**、
-  **42 条事故知识库**、**464 个坏样本自证**；每条规则都能追到一次真实事故。
+  **43 条事故知识库**、**468 个坏样本自证**；每条规则都能追到一次真实事故。
 - **先红后绿**：新守卫先对坏样本变红才算数；**看不到对象就 `skipped`**，绝不报「0 个问题」。
 - **棘轮只降不升**：基线计数只允许下降，回归直接让 CI 变红；没跑到的键报 `unverified`，
   局部运行拒绝写基线（`RATCHET_REFUSE`）。

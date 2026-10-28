@@ -100,6 +100,14 @@ export interface RuleSpec {
   provenance: string
   applies(rel: string): boolean
   /**
+   * 除 `source.roots` 外，本规则还要看的目录（相对 root）。
+   *
+   * 存在的理由：有些判据的对象**按定义就不在源码树里**（自测脚本在 `scriptsDirs`，不在
+   * `app/lib`）。若把它们并进 `source.roots`，其它规则会一起扫到脚本并产生误报；
+   * 让规则自己声明额外射程，射程就是这条规则的事实，而不是配置的副作用。
+   */
+  extraRoots?(ctx: RuleCtx): string[]
+  /**
    * 前置条件不满足 → 返回原因（本轮未检查）。返回 null 表示适用。
    *
    * 想给跳过分类（进棘轮键）就返回 `{ code, reason }`；只写字符串会统一落
@@ -182,9 +190,9 @@ export async function loadSchemaFacts(root: string, config: QeConfig): Promise<S
   }
 }
 
-async function collectFiles(root: string, config: QeConfig): Promise<string[]> {
+async function collectFiles(root: string, roots: string[], config: QeConfig): Promise<string[]> {
   const out: string[] = []
-  for (const dir of config.source.roots) {
+  for (const dir of roots) {
     const files = await walkFiles(root, dir, { ignore: config.ignore, ext: config.source.extensions })
     for (const f of files) out.push(path.relative(root, f).split(path.sep).join('/'))
   }
@@ -235,11 +243,15 @@ export function toGuard(spec: RuleSpec): Guard {
           : new NotApplicable(declared.code, declared.reason)
       }
 
-      const files = (await collectFiles(ctx.root, ctx.config)).filter((rel) => spec.applies(rel))
+      const roots = [...ctx.config.source.roots]
+      for (const dir of spec.extraRoots?.(ruleCtx) ?? []) {
+        if (dir && !roots.includes(dir)) roots.push(dir)
+      }
+      const files = (await collectFiles(ctx.root, roots, ctx.config)).filter((rel) => spec.applies(rel))
       if (files.length === 0) {
         throw new NotApplicable(
           SKIP_CODE_EMPTY_SCOPE,
-          `射程内 0 个文件（roots=${ctx.config.source.roots.join(',')}）：0 命中不代表无缺陷`,
+          `射程内 0 个文件（roots=${roots.join(',')}）：0 命中不代表无缺陷`,
         )
       }
 
@@ -271,7 +283,7 @@ export function toGuard(spec: RuleSpec): Guard {
       if (findings.length === 0) {
         findings.push(info(`${spec.code}_CLEAN`, `${checked}/${files.length} 文件已检查，0 命中`))
       }
-      return { findings, scanned: `files=${checked}/${files.length} roots=${ctx.config.source.roots.join(',')}` }
+      return { findings, scanned: `files=${checked}/${files.length} roots=${roots.join(',')}` }
     },
     // GuardCase 需要真实目录，故在首次取用时落盘（不在模块导入时做副作用）
     get selfTest() {
