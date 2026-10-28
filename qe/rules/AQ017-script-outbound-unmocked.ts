@@ -167,6 +167,114 @@ function specsOf(code: string): Array<{ spec: string; index: number }> {
   return out
 }
 
+/**
+ * 同文件 fetch 垫片：`globalThis.fetch = (async (input, init) => { … })`。
+ *
+ * 冒烟脚本常把真实出网关在垫片里（例如只拦自己的 COS 桶），随后用 `globalThis.fetch`
+ * 打这个桶——那是零真实网络的本地桩，不是「真出网」。旧判据只认 force-mock-env import，
+ * 把这类垫片调用一起报红（真实仓实测 2 条 error 全是垫片）。
+ *
+ * 豁免必须能证明「这个主机会被垫片截住」，所以只认垫片函数体里按 URL 前缀/全等分流的变量：
+ *   `u.startsWith(`${GATE_ORIGIN}/`)` / `u === `${GATE_ORIGIN}``
+ * 并且只豁免**地址以该变量开头**的调用；同一文件里打其它真实主机的 fetch 仍报红。
+ */
+const SHIM_ASSIGN = /(?:globalThis|global|window)\s*\.\s*fetch\s*=/g
+const SHIM_GUARDS = [
+  /startsWith\s*\(\s*`[^`]*?\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g,
+  /===\s*`[^`]*?\$\{\s*([A-Za-z_$][\w$]*)\s*\}/g,
+]
+
+function shimGuardedHosts(code: string, masked: string): Set<string> {
+  const out = new Set<string>()
+  SHIM_ASSIGN.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = SHIM_ASSIGN.exec(masked)) !== null) {
+    const arrow = masked.indexOf('=>', m.index)
+    if (arrow < 0) continue
+    const brace = masked.indexOf('{', arrow)
+    if (brace < 0) continue
+    const end = matchDelimiter(masked, brace)
+    if (end < 0) continue
+    const body = code.slice(brace, end + 1)
+    for (const re of SHIM_GUARDS) {
+      re.lastIndex = 0
+      let g: RegExpExecArray | null
+      while ((g = re.exec(body)) !== null) out.add(g[1])
+    }
+  }
+  return out
+}
+
+/** 被调地址是否以垫片分流的主机开头（直接模板，或同文件一跳 `const url = `${HOST}/…``） */
+function shimHostOf(arg: string, code: string, hosts: Set<string>): boolean {
+  if (hosts.size === 0) return false
+  const t = arg.trim()
+  const direct = /^`\s*\$\{\s*([A-Za-z_$][\w$]*)\s*\}/.exec(t)
+  if (direct && hosts.has(direct[1])) return true
+  if (/^[A-Za-z_$][\w$]*$/.test(t)) {
+    const init = declaredInit(code, t)
+    const hop = init ? /^\s*`\s*\$\{\s*([A-Za-z_$][\w$]*)\s*\}/.exec(init) : null
+    if (hop && hosts.has(hop[1])) return true
+  }
+  return false
+}
+
+/**
+ * 显式真连通开关：`const live = process.env.COS_LIVE === '1' && …`。
+ *
+ * 真连通若**默认关闭、且只在 `if (live)` 分支里调用**，脚本正常跑一遍并不出网——
+ * 这是显式 opt-in，不是「跑一次就打一次真实接口」。旧判据把函数体里的 fetch 一起报红。
+ *
+ * 豁免射程只到「`if (live)` 的块」与「块内被调用函数体」：
+ * 定义了 live 变量但无条件调用 runLive() 时，射程为空，仍按真出网报（反证见 fixtures）。
+ */
+const LIVE_GATE = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*process\.env\.[A-Za-z0-9_]*(?:_LIVE|_REAL)\s*===\s*(['"])1\2/g
+const CALLED = /\b([A-Za-z_$][\w$]*)\s*\(/g
+
+/** 同文件函数体区间：`function name(` / `const name = (…) => {` */
+function functionBodySpan(masked: string, name: string): [number, number] | null {
+  const decl = new RegExp(
+    `(?:\\bfunction\\s+${escapeRe(name)}\\s*\\()|(?:\\b(?:const|let|var)\\s+${escapeRe(name)}\\s*=\\s*(?:async\\s*)?(?:function\\s*\\(|(?:\\([^)]*\\)|[A-Za-z_$][\\w$]*)\\s*=>))`,
+    'g',
+  )
+  const m = decl.exec(masked)
+  if (!m) return null
+  const brace = masked.indexOf('{', m.index + m[0].length)
+  if (brace < 0) return null
+  const end = matchDelimiter(masked, brace)
+  return end < 0 ? null : [brace, end]
+}
+
+function liveOptInScopes(code: string, masked: string): Array<[number, number]> {
+  const gates = new Set<string>()
+  LIVE_GATE.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = LIVE_GATE.exec(code)) !== null) gates.add(m[1])
+  const spans: Array<[number, number]> = []
+  for (const gate of gates) {
+    const ifRe = new RegExp(`\\bif\\s*\\(\\s*${escapeRe(gate)}\\s*\\)\\s*\\{`, 'g')
+    let im: RegExpExecArray | null
+    while ((im = ifRe.exec(masked)) !== null) {
+      const open = im.index + im[0].lastIndexOf('{')
+      const end = matchDelimiter(masked, open)
+      if (end < 0) continue
+      spans.push([open, end])
+      const block = masked.slice(open + 1, end)
+      CALLED.lastIndex = 0
+      let cm: RegExpExecArray | null
+      while ((cm = CALLED.exec(block)) !== null) {
+        const fn = functionBodySpan(masked, cm[1])
+        if (fn) spans.push(fn)
+      }
+    }
+  }
+  return spans
+}
+
+function insideSpans(spans: Array<[number, number]>, index: number): boolean {
+  return spans.some(([a, b]) => index >= a && index <= b)
+}
+
 export const aq17 = toGuard({
   id: 'aq17',
   title: '自测脚本真出网（未强制 mock 环境）',
@@ -179,6 +287,9 @@ export const aq17 = toGuard({
     '地址是变量时只做**同文件一跳**声明解析（`const BASE = process.env.X || "http://127.0.0.1:3001"` 判本机）；跨文件、环境注入、函数返回的地址按 unknown 报',
     '地址是变量/函数返回值且一跳内看不到任何主机字面量时按 unknown 报（宁可多报一条，也不把真出网当本机）；`http://` 字面量主机解析只做字符串判断',
     '本地 dev server 与相对地址一律放过：那是正确用法，不是外部副作用',
+    '同文件 fetch 垫片只认 `globalThis/global/window.fetch = (…) => { … }` 且函数体内按 `startsWith(`${VAR}…`)` / `=== `${VAR}`` 分流：垫片用正则/URL 解析器分流、或分流变量在别处拼接时看不见，仍按真出网报',
+    '垫片豁免只覆盖地址**以该分流变量开头**的调用；同一文件打其它真实主机的 fetch 仍报（见反证样本）',
+    '显式 live opt-in 只认 `const live = process.env.X_LIVE === "1"`（或 `_REAL`）且调用位于 `if (live) { … }` 块或其块内直接调用的同文件函数体：`if (process.env.X_LIVE === "1")` 直接判、经 wrapper 间接调用、`&&` 链里调用不可见，仍按真出网报',
     '不做运行期验证：本规则证明「代码里没有强制 mock 的入口」，不证明跑起来一定不出网',
   ],
   impact:
@@ -213,6 +324,9 @@ export const aq17 = toGuard({
 
     const hits: RawHit[] = []
     const seen = new Set<number>()
+    // 同文件可证的「不出网」形态：fetch 垫片分流的主机、显式 live opt-in 分支
+    const shimHosts = shimGuardedHosts(code, masked)
+    const liveScopes = liveOptInScopes(code, masked)
 
     for (const s of specs) {
       if (!isOutboundPkg(s.spec) || seen.has(s.index)) continue
@@ -236,7 +350,12 @@ export const aq17 = toGuard({
         // 实参取**原文**（要读字符串字面量的内容），结构位置取掩码面（字符串里的逗号不切分）
         const arg = argSpanAt(masked, open, 0)
         if (arg === null) continue
-        const cls = addressClass(code.slice(open + 1, open + 1 + arg.length), code)
+        const argText = code.slice(open + 1, open + 1 + arg.length)
+        // 垫片截住的主机：地址以垫片分流变量开头 → 零真实网络
+        if (shimHostOf(argText, code, shimHosts)) continue
+        // 显式 opt-in：调用位于 `if (live)` 块或其调用函数体内 → 默认不跑
+        if (insideSpans(liveScopes, m.index)) continue
+        const cls = addressClass(argText, code)
         if (cls === 'local') continue
         if (seen.has(m.index)) continue
         seen.add(m.index)
@@ -341,6 +460,63 @@ export const aq17 = toGuard({
       rel: 'scripts/smoke-pay.ts',
       src: "import './lib/offline-gateway.ts'\nexport const res = await fetch('https://pay.example.com/charge')\n",
       options: { mockEnvImport: ['offline-gateway'] },
+    },
+    {
+      name: '同文件 fetch 垫片只拦自己的桶（不该报）：跑一遍零真实网络',
+      expect: 'green',
+      rel: 'scripts/smoke-aftersale-a1-cleanup.ts',
+      src:
+        'const GATE_ORIGIN = `https://${GATE_BUCKET}.cos.${GATE_REGION}.myqcloud.com`\n' +
+        'const realFetch = globalThis.fetch\n' +
+        'globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {\n' +
+        '  const u = typeof input === \'string\' ? input : String(input)\n' +
+        '  if (u.startsWith(`${GATE_ORIGIN}/`)) return new Response(\'\', { status: 200 })\n' +
+        '  return realFetch(input as never, init as never)\n' +
+        '}) as typeof fetch\n' +
+        'export const res = await globalThis.fetch(`${GATE_ORIGIN}/aftersale/x.jpg`, { method: \'DELETE\' })\n',
+    },
+    {
+      // 反证：垫片有，但同一文件另打真实主机——垫片挡不住它，必须报。
+      name: '有 fetch 垫片但另打真实支付网关（该报）：垫片只覆盖自己的桶',
+      expect: 'red',
+      rel: 'scripts/smoke-aftersale-a1-cleanup.ts',
+      src:
+        'const GATE_ORIGIN = `https://${GATE_BUCKET}.cos.${GATE_REGION}.myqcloud.com`\n' +
+        'const realFetch = globalThis.fetch\n' +
+        'globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {\n' +
+        '  const u = typeof input === \'string\' ? input : String(input)\n' +
+        '  if (u.startsWith(`${GATE_ORIGIN}/`)) return new Response(\'\', { status: 200 })\n' +
+        '  return realFetch(input as never, init as never)\n' +
+        '}) as typeof fetch\n' +
+        'await globalThis.fetch(`${GATE_ORIGIN}/aftersale/x.jpg`, { method: \'DELETE\' })\n' +
+        'await fetch(\'https://api.mch.weixin.qq.com/v3/pay\', { method: \'POST\' })\n',
+    },
+    {
+      name: '真连通默认关闭、只在 if (live) 分支调用（不该报）：显式 opt-in',
+      expect: 'green',
+      rel: 'scripts/smoke-cos-sign.ts',
+      src:
+        "const live = process.env.COS_LIVE === '1' && cosConfigured()\n" +
+        'if (live) {\n' +
+        '  void runLive()\n' +
+        '}\n' +
+        'export async function runLive(): Promise<void> {\n' +
+        "  const put = await fetch('https://bucket.cos.ap-shanghai.myqcloud.com/x.jpg', { method: 'PUT' })\n" +
+        '  return put.body\n' +
+        '}\n',
+    },
+    {
+      // 反证：定义了 live 变量却无条件调用——那不是 opt-in，跑一遍就出网。
+      name: '有 live 变量但无条件调用真连通函数（该报）：默认不跑才叫 opt-in',
+      expect: 'red',
+      rel: 'scripts/smoke-cos-sign.ts',
+      src:
+        "const live = process.env.COS_LIVE === '1' && cosConfigured()\n" +
+        'void runLive()\n' +
+        'export async function runLive(): Promise<void> {\n' +
+        "  await fetch('https://bucket.cos.ap-shanghai.myqcloud.com/x.jpg', { method: 'PUT' })\n" +
+        '}\n' +
+        "export const gate = live\n",
     },
     {
       name: '非自测脚本的部署脚本（不该报）：射程只到自测脚本',

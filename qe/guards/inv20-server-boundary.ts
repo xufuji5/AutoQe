@@ -8,6 +8,7 @@ import type { ExportedFunction } from '../lib/ast-utils.ts'
 import type { SourceFileInfo } from '../lib/providers.ts'
 import { loadSchemaFacts } from '../lib/rule-guard.ts'
 import { authVocabulary, hasAuthEvidence } from '../lib/auth-evidence.ts'
+import { escapeRe, stripComments } from '../lib/code-only.ts'
 import { classifyDuplicateRisk, DUPLICATE_RISK_LABEL, parseWriteTables } from '../lib/schema-facts.ts'
 import type { SchemaFacts } from '../lib/schema-facts.ts'
 
@@ -84,11 +85,81 @@ const RAW_EXEC_UNSAFE = /\$(?:executeRawUnsafe)\s*\(|\bExecuteRawUnsafe\s*\(/
 const RAW_EXEC_DYNAMIC = /\$executeRaw\s*\(/
 const RAW_EXEC_TAGGED = /\$executeRaw\s*`/
 /**
- * 摘要计算里的 `.update(` 不是库写：`createHash('sha256').update(buf).digest('hex')` 是纯计算，
- * 按子串匹配会被当成「更新一行」。只剥离「哈希工厂调用后紧跟 .update(」这一形态，
+ * 摘要/签名/加解密计算里的 `.update(` 不是库写：
+ * `createHash('sha256').update(buf).digest('hex')`、`createVerify('RSA-SHA256').update(msg)` 都是纯计算，
+ * 按子串匹配会被当成「更新一行」——真实仓里 `verifyWxpaySignature(.update()` 正是这条误报。
+ *
+ * 只剥离可证的两形态：
+ *   ① 工厂调用后**紧跟** `.update(`（`createHash(...).update(` / `createVerify(...).update(`）；
+ *   ② 变量由工厂调用赋值，之后对该变量调 `.update(`（`const h = createHash('sha256'); h.update(x)`）。
  * 其余 `.update(` 仍按写算（宁可漏剥，不可错剥）。
  */
-const HASH_CHAIN = /\b(?:createHash|createHmac)\s*\([^)]*\)\s*\.\s*update\s*\(/g
+const CRYPTO_FACTORY = 'createHash|createHmac|createSign|createVerify|createCipher|createCipheriv|createDecipher|createDecipheriv'
+const CRYPTO_UPDATE_CHAIN = new RegExp(`\\b(?:${CRYPTO_FACTORY})\\s*\\([^)]*\\)\\s*\\.\\s*update\\s*\\(`, 'g')
+const CRYPTO_ASSIGN = new RegExp(
+  `\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*(?::[^=\\n]+)?=\\s*(?:crypto\\s*\\.\\s*)?(?:${CRYPTO_FACTORY})\\s*\\(`,
+  'g',
+)
+/**
+ * 集合类 `.delete(` 不是库写：`map.delete(key)` / `set.delete(v)` / `headers.delete(h)` /
+ * `searchParams.delete(k)` / `formData.delete(f)` 都是内存或请求对象上的键操作。
+ * 真实仓里 `evictIfNeeded(map.delete(oldest))` 被记成写痕迹，把只读出口顶成「既有写」。
+ *
+ * 只剥离「接收者能证明是集合」的形态：`new Map/Set/…` 赋值的变量、参数/声明标注
+ * `: Map<…` 一类的变量、以及 `headers` / `searchParams` / `formData` 这类惯用名。
+ */
+const NON_DB_DELETE_TYPES = 'Map|Set|WeakMap|WeakSet|Headers|URLSearchParams|FormData'
+const NON_DB_DELETE_ASSIGN = new RegExp(
+  `\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*(?::\\s*(?:${NON_DB_DELETE_TYPES})[^=]*)?=\\s*new\\s+(?:${NON_DB_DELETE_TYPES})\\s*[<([]`,
+  'g',
+)
+const NON_DB_DELETE_PARAM = new RegExp(
+  `([A-Za-z_$][\\w$]*)\\s*:\\s*(?:${NON_DB_DELETE_TYPES})\\s*[<\\s,)=]`,
+  'g',
+)
+/** 请求对象的惯用接收者名：`headers.delete(` / `searchParams.delete(` / `formData.delete(` */
+const COLLECTION_NAMES = ['headers', 'searchParams', 'urlSearchParams', 'formData']
+
+/**
+ * 把非库写（摘要/签名的 `.update(`、集合的 `.delete(`）换成标记词，
+ * 既不进入 WRITE_CALLS 的子串统计，也不影响 `<client>.<model>.<write>(` 的落表识别。
+ *
+ * 声明经常在**文件级**（`const windows = new Map()` / `const signer = createSign(…)`），
+ * 而被扫的文本只是函数体：只看函数体文本会把模块级集合/签名器漏掉，所以先按整文件收一遍接收者。
+ */
+function nonDbReceivers(sf: ts.SourceFile): { crypto: Set<string>; collections: Set<string> } {
+  const text = sf.getFullText()
+  const crypto = new Set<string>()
+  const collections = new Set<string>(COLLECTION_NAMES)
+  CRYPTO_ASSIGN.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = CRYPTO_ASSIGN.exec(text)) !== null) crypto.add(m[1])
+  for (const re of [NON_DB_DELETE_ASSIGN, NON_DB_DELETE_PARAM]) {
+    re.lastIndex = 0
+    while ((m = re.exec(text)) !== null) collections.add(m[1])
+  }
+  return { crypto, collections }
+}
+
+function maskNonDbWrites(text: string, known: { crypto: Set<string>; collections: Set<string> }): string {
+  let out = text.replace(CRYPTO_UPDATE_CHAIN, 'CRYPTO_UPDATE(')
+  const cryptoVars = new Set<string>(known.crypto)
+  CRYPTO_ASSIGN.lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = CRYPTO_ASSIGN.exec(text)) !== null) cryptoVars.add(m[1])
+  const collections = new Set<string>(known.collections)
+  for (const re of [NON_DB_DELETE_ASSIGN, NON_DB_DELETE_PARAM]) {
+    re.lastIndex = 0
+    while ((m = re.exec(text)) !== null) collections.add(m[1])
+  }
+  if (cryptoVars.size > 0) {
+    out = out.replace(new RegExp(`\\b(?:${[...cryptoVars].map(escapeRe).join('|')})\\s*\\.\\s*update\\s*\\(`, 'g'), 'CRYPTO_UPDATE(')
+  }
+  if (collections.size > 0) {
+    out = out.replace(new RegExp(`\\b(?:${[...collections].map(escapeRe).join('|')})\\s*\\.\\s*delete\\s*\\(`, 'g'), 'COLLECTION_DELETE(')
+  }
+  return out
+}
 /**
  * 留痕写（审计 / 拒绝路径）的函数名。
  *
@@ -375,9 +446,10 @@ function writeEvidence(
   const sqlTables = new Set<string>()
   const why: string[] = []
   let unresolved = false
-  const scan = (text: string, label: string, audit = false): void => {
-    // 先剥离摘要计算的假写，再按词表扫（`$executeRaw` 不再按调用名算写，见 RAW_EXEC_* 注释）
-    const clean = text.replace(HASH_CHAIN, 'HASH_UPDATE(')
+  const nonDb = nonDbReceivers(sf)
+  const scan = (text: string, label: string, audit = false, receivers = nonDb): void => {
+    // 先剥注释（注释里写 `.update(` 不是写），再剥非库写（摘要/签名的 update、集合的 delete），最后按词表扫
+    const clean = maskNonDbWrites(stripComments(text), receivers)
     const local = WRITE_CALLS.filter((p) => clean.includes(p))
     if (local.length > 0) (audit ? auditHits : hits).push(`${label}(${local.join(',')})`)
     // raw SQL：字面量表名可解析 → 换回 Prisma 模型名；换不回来就只据实列表名
@@ -459,12 +531,14 @@ function writeEvidence(
     }
     const fnBody = bodyTextOf(fn, targetSf)
     const label = `${targetRel}#${name}${fn.name === name ? '' : `=${fn.name}`}`
+    // 接收者按**目标文件**收集：模块级 `const breakers = new Map()` 只在目标文件里才看得到
+    const targetReceivers = nonDbReceivers(targetSf)
     // 留痕写：只扫它自己的函数体（拒绝路径的写是安全留痕），不计入业务目标，也不据此要求幂等
     if (auditCalls.includes(name)) {
-      scan(fnBody, label, true)
+      scan(fnBody, label, true, targetReceivers)
       continue
     }
-    scan(fnBody, label)
+    scan(fnBody, label, false, targetReceivers)
     const nested = writeEvidence(
       fnBody,
       targetRel,
@@ -513,7 +587,7 @@ export const inv20 = defineGuard({
     '公共路由按 qe.config.json 的 boundaries.publicRoutes 登记，未登记的公共入口仍会被判红',
     '静态桩判据只认「入口体单条 return + 返回值纯字面量」：返回值引用任何标识符（import 的常量、process.env）仍按裸奔判，宁可多报一句也不放过静态抄出的敏感内容',
     "落表分档认两种写目标：`<client>.<model>.<write>(`（client 名取 schema.clientNames）与 raw SQL 字面量表名（`INSERT INTO t` / `UPDATE t SET` / `DELETE FROM t`，表名经 schema 的 `@@map` 换回模型名）；动态表名（`UPDATE ${table}`）、表不在 schema 里、非标准 client 名一律报「落表不可判定」，不当成「无唯一键」",
-    "`$executeRaw` 按 SQL 内容判写：模板字面量里有 DML/DDL 才算写（`SELECT set_config(…)` 这类 RLS 上下文不算），参数化 `$executeRaw(sql)`/`$executeRawUnsafe` 因 SQL 可能在别处拼而保守算写；`createHash(…).update(…)` 属摘要计算，剥掉后不计写",
+    "`$executeRaw` 按 SQL 内容判写：模板字面量里有 DML/DDL 才算写（`SELECT set_config(…)` 这类 RLS 上下文不算），参数化 `$executeRaw(sql)`/`$executeRawUnsafe` 因 SQL 可能在别处拼而保守算写；`createHash/createVerify(…).update(…)` 属摘要计算、`Map/Set/Headers/URLSearchParams/FormData` 变量上的 `.delete(…)` 属集合键操作，剥掉后都不计写；未按此形态声明的接收者（如未标注类型的 `m.delete(`、别名经函数返回的集合）仍按写算",
     '分档只答「双提交会真落两份 / 只会撞库 500 / 落表不可判定 / 写痕迹未出现 / 只见留痕写」，不改变缺口本身的存在性；raw SQL 写非 Prisma 表（如运营侧单例快照）时只据实列表名，是否幂等需人工裁定',
     "留痕写（`logAccessDeny` / `writeAuditEvent` 一类）单独收：它们足以否定只读豁免，但不参与业务分档——多一条 deny 日志不是业务重复。仓级封装走 `boundaries.auditWriteCalls` 追加",
     '导出别名（`export const read = write`）只跟一跳同文件别名；跨文件别名链、barrel 重导出仍按不可解处理，不猜',
@@ -885,6 +959,22 @@ export const inv20 = defineGuard({
       name: 'good：`$executeRaw` 只设 RLS 上下文 + `createHash().update()` 摘要计算，都不算写（旧判据报未证明）',
       root: path.join(FIXTURES, 'readonly-hash'),
       expect: 'green',
+      config: { source: { collector: 'ts', roots: ['app'], extensions: [] } },
+    },
+    {
+      // 真实仓实测：`createVerify(...).update()` 与 `map.delete()` / `headers.delete()` 被记成写痕迹，
+      // 把只读出口顶成「既有写」。非库写必须剥离，但 `<client>.<model>.<write>(` 不许一起剥。
+      name: 'good：`createVerify().update()` 与 Map/Headers 的 `.delete()` 都不算库写（旧判据报未证明）',
+      root: path.join(FIXTURES, 'readonly-nondb'),
+      expect: 'green',
+      config: { source: { collector: 'ts', roots: ['app'], extensions: [] } },
+    },
+    {
+      name: 'warn：`prisma.order.update()` 仍是库写（剥非库写时不得误剥 Prisma 调用）',
+      root: path.join(FIXTURES, 'write-client-update'),
+      expect: 'warn',
+      minWarnings: 1,
+      maxWarnings: 1,
       config: { source: { collector: 'ts', roots: ['app'], extensions: [] } },
     },
     {
