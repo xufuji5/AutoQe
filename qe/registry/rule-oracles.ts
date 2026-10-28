@@ -142,6 +142,36 @@ export const RULE_ORACLES: Record<string, RuleOracle> = {
     guardedBy: ['INV-RES-05'],
   },
 
+  /* ---------- AQ019–AQ022：门禁输入 / 平台保活 / 共用解析层 ---------- */
+  aq19: {
+    source:
+      'middleware/proxy 文件里 `matcher: [...]` 数组的字面量条目 × 扩展名分组前那个点的**源码前一个字符**是否为反斜杠' +
+      '（字符事实，换个人用同样的源码复算结论相同）',
+    kind: 'machine',
+    guardedBy: ['INV-SEC-04'],
+  },
+  aq20: {
+    source:
+      '名字含独立 `ip` 词元的函数体 × 客户端可控头读取位置 × 函数体内是否出现传输层地址/可信代理声明/' +
+      '两源一致性比较（三类证据都由源码词法直接复算）',
+    kind: 'machine',
+    guardedBy: ['INV-SEC-05'],
+  },
+  aq21: {
+    source:
+      '文件的 Edge/Serverless 能力证据（runtime=edge / ExecutionContext / waitUntil）× `.catch` 实参是否为空处理 × ' +
+      '该调用链是否被 await / return / waitUntil(…) 包裹（纯语法位置判定）',
+    kind: 'machine',
+    guardedBy: ['INV-SEC-06'],
+  },
+  aq22: {
+    source:
+      '脚本文件 `.replace` 第一参的原文 × 归一化（去反斜杠与空白）后是否同时含块注释开场符与闭合符' +
+      '（模式文本可直接复算）',
+    kind: 'machine',
+    guardedBy: ['INV-META-06'],
+  },
+
   /* ---------- MP001–MP008：小程序域（宿主时序/样式作用域/配置表） ---------- */
   mp01: {
     source: '定时器回调体的 AST × 页面/组件生命周期钩子（onUnload/detached）与存活短路的出现位置',

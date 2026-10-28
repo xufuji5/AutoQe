@@ -307,6 +307,44 @@ export const registry: Invariant[] = [
     gap: '公开资源（公开资产、文章）按 id 直取合法，需在 `publicModels` 声明；id 是否来自请求按**赋值回溯**判定（`record.id` 这类已鉴权实体不报）；查后 40 行内的归属断言可见，跨函数的仍会漏；平台运营面前缀需声明',
     decidedAt: '2026-10-24',
   },
+  {
+    id: 'INV-SEC-04',
+    statement: '门禁的排除规则必须精确成立：判据里的元字符不得把本该受管的路由排除在外',
+    defectClasses: ['防线幻觉', '隐性陷阱'],
+    guard: 'qe:guard:aq19',
+    badSample: 'qe/rules/AQ019-matcher-unescaped-dot.ts 的 fixtures（未转义点绕过中间件 / 已转义不该报 / 路径分组不该报）',
+    status: 'partial',
+    gap:
+      '只判 middleware/proxy 文件里 `matcher: [...]` 数组的「静态资源分组前的点是否转义」；单字符串 matcher、常量引用、运行时构造的 matcher 不可见。' +
+      '不判断这条 matcher 究竟覆盖了哪些真实路由（「新增路由后是否裸奔」由路由清单类判据回答）；扩展名词表有限，可追加 `rules.aq19.staticExtensions`',
+    decidedAt: '2026-10-28',
+  },
+  {
+    id: 'INV-SEC-05',
+    statement: '安全决策的输入来自不可伪造的信道：客户端可控请求头不得单独充当身份、限流键或审计归属',
+    defectClasses: ['防线幻觉', '接缝'],
+    guard: 'qe:guard:aq20',
+    badSample: 'qe/rules/AQ020-client-header-trust.ts 的 fixtures（只解析 x-forwarded-for / 只读 x-real-ip / 两源一致不该报 / 平台 ip 不该报）',
+    status: 'partial',
+    gap:
+      '射程只到「函数名含独立 `ip` 词元」的函数（`rateLimitKey` / `getIdentity` 这类命名不认）；只认函数声明与 `const x = (…) =>` 两种载体。' +
+      '「不可伪造来源」只认传输层/平台地址与可信代理标记（可用 `rules.aq20.trustedProxyMarkers` 追加）；两源一致性只认「≥2 个不同头 + 比较运算符」的写法。' +
+      '「入站同名头是否已被网关剥离」是部署面事实，命中一律出候选',
+    decidedAt: '2026-10-28',
+  },
+  {
+    id: 'INV-SEC-06',
+    statement: '服务端边界的异步副作用必须有平台保活（await / waitUntil），不得以空 catch 丢弃',
+    defectClasses: ['隐性陷阱', '防线幻觉'],
+    guard: 'qe:guard:aq21',
+    badSample: 'qe/rules/AQ021-edge-fire-and-forget.ts 的 fixtures（Edge handler 里空 catch 丢 Promise / waitUntil 不该报 / await 不该报 / 非 Edge 文件不该报）',
+    status: 'partial',
+    gap:
+      '射程只到文件里具备 Edge/Serverless 能力证据（`runtime = "edge"` / `ExecutionContext` / `waitUntil(`）的文件；普通 Node 服务端文件不判。' +
+      '只认 `.catch(<空处理>)` 形态（只有 `.then`、`void promise` 无 catch、`Promise.all` 收走的不判）；保活只认 `await` / `return` / `waitUntil(…)` 三种词法包裹。' +
+      '「这个运行时是否真的会回收」是部署平台事实，命中固定为候选',
+    decidedAt: '2026-10-28',
+  },
 
   /* ---------- Prisma / PostgreSQL 并发正确性 ---------- */
   {
@@ -568,6 +606,21 @@ export const registry: Invariant[] = [
     badSample: 'scripts/verify-triage.ts 的备案三态样本（有效压制 / 过期不压制 / 非法不压制）',
     status: 'enforced',
     decidedAt: '2026-10-25',
+  },
+
+  /* ---------- 判据的取码面：只允许一份实现 ---------- */
+  {
+    id: 'INV-META-06',
+    statement: '读源码/取码面的解析只有一份实现：脚本不得手写块注释剥离等会静默改写输入的私有解析器',
+    defectClasses: ['测试方法论', '证据不足'],
+    guard: 'qe:guard:aq22',
+    badSample: 'qe/rules/AQ022-handwritten-comment-stripper.ts 的 fixtures（正则块注释剥离 / 开场闭合一起删 / 共用实现不该报 / 只剥行注释不该报）',
+    status: 'partial',
+    gap:
+      '射程只到 `scripts` / `tools` / `ci` 与名字含 `code-only` / `strip-comments` 的文件；只认 `.replace(<第一参>)` 且同一模式同时含块注释开场/闭合符的形态。' +
+      '`split(...).join(...)`、多次 replace、从常量/配置拼模式、以及行注释的私有剥离不判。' +
+      '不验证这份实现是否真的被用在判据的取码路径上——出现即出候选（warn）',
+    decidedAt: '2026-10-28',
   },
 
   /* ---------- 跨项目隔离（引擎可跨项目，项目状态绝不可） ---------- */

@@ -33,6 +33,10 @@ import { aq14 } from '../rules/AQ014-tx-scoped-conflict-fallback.ts'
 import { aq16 } from '../rules/AQ016-verify-always-true.ts'
 import { aq17 } from '../rules/AQ017-script-outbound-unmocked.ts'
 import { aq18 } from '../rules/AQ018-dev-gate-data-fallback.ts'
+import { aq19 } from '../rules/AQ019-matcher-unescaped-dot.ts'
+import { aq20 } from '../rules/AQ020-client-header-trust.ts'
+import { aq21 } from '../rules/AQ021-edge-fire-and-forget.ts'
+import { aq22 } from '../rules/AQ022-handwritten-comment-stripper.ts'
 import { aq15 } from './aq15-reuse-opportunity.ts'
 import { mp01 } from '../rules/MP001-timer-after-unload.ts'
 import { mp02 } from '../rules/MP002-component-style-isolation.ts'
@@ -83,6 +87,10 @@ export const guards: Guard[] = [
   aq16,
   aq17,
   aq18,
+  aq19,
+  aq20,
+  aq21,
+  aq22,
   // 小程序域（`miniprogram/`）：宿主是双线程模型 + 页面栈 + 样式隔离，
   // 它的缺陷几乎都不报错——只在真机上表现成「样式没了/点了没反应/整块白掉」。
   mp01,
