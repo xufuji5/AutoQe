@@ -23,6 +23,8 @@ projects you want to audit. It never needs to be copied into them.
 | Server boundary | entries without auth / validation / idempotency, public routes without a reason, mutating endpoints without a limit | `inv20`, `aq01`, `aq06`, `inv28` |
 | Seams & client state | client code importing Prisma/Node, sensitive fields persisted by a store, an endpoint with no UI send point, production code importing mocks | `inv21`, `inv22`, `inv23`, `aq12` |
 | Concurrency & consistency | check-then-act, missing tenant predicate, IDOR, missing idempotency key, wrong reading shape, conflict fallback inside a transaction | `aq04`, `aq05`, `aq08`–`aq10`, `aq14` |
+| Security boundary | eval / new Function / string-form timers, innerHTML without sanitize, missing cache revalidation tag on mutation | `aq41`, `aq42`, `aq35` |
+| Type & UI correctness | `as any` / `: any` density degrading the type system, React Hook called inside `if`/`for`/`while` violating Rules of Hooks | `aq43`, `aq44` |
 | False green | assertions that can never fail, status literals, swallowed errors, hardcoded data | `aq02`, `aq03`, `aq07`, `aq13` |
 | Dev-time fake scaffolding | verifiers that ignore their inputs and always pass, self-test scripts hitting real external services without a forced mock, dev gates / catch branches returning hardcoded business data | `aq16`–`aq18` |
 | Promises & addressability | documented promises with no enforcement point, idle gates, unregistered guards, assertion targets missing in CI, docs promising unimplemented things | `inv06`, `inv07`, `inv13`, `inv24`, `spec-abs` |
@@ -38,9 +40,17 @@ Four rules make it more than a pile of regexes:
 3. **No vacuous green** — a guard that cannot see its subject reports `skipped`, never "0 findings".
 4. **Ratchet** — counts per `guard:finding` are frozen and may only go down; a regression fails CI.
 
-Contains 59 invariants (20 `enforced` / 36 `partial` / 3 `open`), 44 guards (15 `inv` + 18 `aq` + 8 `mp` +
-spec reconciliation + leak + isolation), 25 pure-function rules, 43 incident-backed knowledge entries and
-474 self-test cases. Every rule records the real incident it came from; `open` gaps are listed, not hidden.
+And one constitutional rule above all four:
+
+> **The engine is open-source, neutral, and universal.** It never carries any identifier of the project it
+> was drawn from — code names, real file paths, real table names, industry-specific terms, audit counts,
+> any coordinate that traces back to a specific repo or company. When AutoQe learns from scanning Project A,
+> it abstracts the pattern into a universal rule and drops every fact that belongs to Project A alone.
+> `leak-project-info` (INV-META-01) must pass with `errors=0` before any merge.
+
+Contains **63 invariants** (22 `enforced` / 38 `partial` / 3 `open`), **48 guards** (15 `inv` + 22 `aq` + 8 `mp` +
+spec reconciliation + leak + isolation), 27 pure-function rules, 43 incident-backed knowledge entries and
+**602 self-test cases**. Every rule records the real incident it came from; `open` gaps are listed, not hidden.
 
 ## Requirements
 
@@ -116,16 +126,16 @@ readings embedded.
 ```bash
 npm install
 node qe/cli.ts init
-npm run qe:selftest   # 474 case-level self-checks
+npm run qe:selftest   # 602 case-level self-checks
 npm run qe            # guards + ratchet comparison
 ```
 
 Expected reading:
 
 ```text
-SELFTEST_RESULT cases=474 passed=474 failed=0 status=green
-QE_RESULT guards=44 errors=0 warnings=3 skipped=15 status=yellow
-RATCHET status=ok regressions=0 improvements=0 unverified=0 tracked=18 new=0 skips=15
+SELFTEST_RESULT cases=602 passed=602 failed=0 status=green
+QE_RESULT guards=48 errors=0 warnings=4 skipped=24 status=yellow
+RATCHET status=ok regressions=0 improvements=0 unverified=0 tracked=19 new=0 skips=24
 ```
 
 `skipped=15` is honest, not a failure: `inv23` needs Next.js `api/**/route.*` files, `inv25` / `inv27` /
@@ -156,7 +166,7 @@ it at another project.
 | `npx autoqe selftest` | Bad-sample verification (counter-proof) |
 | `npx autoqe help` | Usage, commands and examples |
 
-In-repo scripts: `npm run qe` (guards + ratchet), `npm run qe:ci` (typecheck + all self-checks + report),
+In-repo scripts: `npm run qe` (guards + ratchet), `npm run qe:ci` (typecheck + **leak guard + all self-checks + report** — leak must pass errors=0 or CI refuses),
 `npm run qe:report`, `npm run qe:triage`, `npm run qe:list`, `npm run typecheck`,
 `npm run test:isolation` (cross-project counter-proofs), `npm run test:oracle`, `npm run test:triage`,
 `npm run qe:guard:invNN|aqNN|mpNN` (one guard).
@@ -245,11 +255,22 @@ npm run typecheck && npm run qe:selftest && npm run qe
 AutoQe 是「不变量优先」的质量工程工具：它不跑测试，而是检查测试枚举不到、且不会报错的结构性缺陷
 （零写/零读列、没有界面入口的端点、永不失败的断言、只在作者机器上能构建的 HEAD、软删表漏谓词等）。
 
-- **59 条不变量**（20 enforced / 36 partial / 3 open）、**44 个守卫**、**25 条纯函数规则**、
-  **43 条事故知识库**、**474 个坏样本自证**；每条规则都能追到一次真实事故。
+- **63 条不变量**（22 enforced / 38 partial / 3 open）、**48 个守卫**、27 条纯函数规则、
+  **43 条事故知识库**、**602 个坏样本自证**；每条规则都能追到一次真实事故。
 - **先红后绿**：新守卫先对坏样本变红才算数；**看不到对象就 `skipped`**，绝不报「0 个问题」。
 - **棘轮只降不升**：基线计数只允许下降，回归直接让 CI 变红；没跑到的键报 `unverified`，
   局部运行拒绝写基线（`RATCHET_REFUSE`）。
+- **开源中立宪法**：引擎仓永不携带任何被扫描项目的特定信息（代号、真实路径、真实表名、行业词）；
+  每次升级必须先「通用化」再入库。`leak-project-info` 守卫 errors=0 才能合并。
+
+**新增安全与类型规则**（从外部安全扫描器通用化抽取）：
+
+| 规则 | 领域 | 级别 |
+|---|---|---|
+| AQ041 | eval / new Function / setTimeout(string) 动态执行入口 | red |
+| AQ042 | innerHTML / dangerouslySetInnerHTML 未紧邻 sanitize | red |
+| AQ043 | `as any` / `: any` 密度过高，类型系统被当噪音处理 | warn |
+| AQ044 | React Hook 在 if/for/while 内调用，违反 Rules of Hooks | red |
 
 用法（推荐）：把仓库下载解压到**任意目录** → 用 Codex / WorkBuddy / Trae 等 AI 工具打开该目录 →
 直接说一句「扫描 `<项目路径>` 的缺陷」。AI 会读 `AGENTS.md`，自行执行
@@ -258,9 +279,12 @@ AutoQe 是「不变量优先」的质量工程工具：它不跑测试，而是�
 
 隔离已内置：同一个引擎可同时扫描多个项目，配置、身份、基线、报告各归各自项目，
 `multi --roots a,b` 一项目一子进程，A 的数据不会进入 B 或引擎目录。仓外只读审计用
-`run --root <other> --config <state>/qe.config.json`，被审计仓零落地。
+`run --root <other> --config <state>/qe.config.json`，被审计仓零落地；`qe.config.json` 与
+报告目录均已 `.gitignore`，不会入库。
+
 本仓开发：`npm install` → `node qe/cli.ts init` → `npm run qe:selftest` → `npm run qe`。
-单条规则：`npx autoqe explain INV-CORE-01`。许可证：MIT。
+CI 门禁：`npm run qe:ci`（typecheck + **leak 守卫 + invariants + skills + 隔离自检 + 报告**，
+leak errors=0 才能通过）。单条规则：`npx autoqe explain INV-CORE-01`。许可证：MIT。
 
 ## License
 
