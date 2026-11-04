@@ -94,6 +94,7 @@
     "qe:guard:aq20": "node qe/cli.ts run --only aq20",
     "qe:guard:aq21": "node qe/cli.ts run --only aq21",
     "qe:guard:aq22": "node qe/cli.ts run --only aq22",
+    "qe:guard:aq40": "node qe/cli.ts run --only aq40",
     "qe:guard:oracle": "node scripts/verify-rule-oracles.ts",
     "qe:guard:spec": "node qe/cli.ts run --only spec-abs",
     "qe:guard:waivers": "node scripts/verify-triage.ts",

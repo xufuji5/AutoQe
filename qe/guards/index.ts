@@ -37,6 +37,24 @@ import { aq19 } from '../rules/AQ019-matcher-unescaped-dot.ts'
 import { aq20 } from '../rules/AQ020-client-header-trust.ts'
 import { aq21 } from '../rules/AQ021-edge-fire-and-forget.ts'
 import { aq22 } from '../rules/AQ022-handwritten-comment-stripper.ts'
+import { aq23 } from '../rules/AQ023-uncached-server-read.ts'
+import { aq24 } from '../rules/AQ024-dev-perf-killswitch.ts'
+import { aq25 } from '../rules/AQ025-serial-after-promise-all.ts'
+import { aq26 } from '../rules/AQ026-long-copy-in-short-slot.ts'
+import { aq27 } from '../rules/AQ027-long-copy-hardcoded.ts'
+import { aq28 } from '../rules/AQ028-duplicate-copy-across-components.ts'
+import { aq29 } from '../rules/AQ029-hardcoded-arbitrary-value.ts'
+import { aq30 } from '../rules/AQ030-check-then-act-without-unique.ts'
+import { aq31 } from '../rules/AQ031-prisma-read-no-select.ts'
+import { aq32 } from '../rules/AQ032-duplicate-auth-in-tree.ts'
+import { aq33 } from '../rules/AQ033-uncached-external-api-in-server-component.ts'
+import { aq34 } from '../rules/AQ034-top-level-date-in-server-component.ts'
+import { aq35 } from '../rules/AQ035-cache-tag-no-revalidate.ts'
+import { aq37 } from '../rules/AQ037-partial-index-migration-missing.ts'
+import { aq38 } from '../rules/AQ038-db-url-no-connection-limit.ts'
+import { aq36 } from '../rules/AQ036-missing-compound-index.ts'
+import { aq39 } from '../rules/AQ039-expiring-table-no-cleanup-job.ts'
+import { aq40 } from '../rules/AQ040-gate-copy-literal.ts'
 import { aq15 } from './aq15-reuse-opportunity.ts'
 import { mp01 } from '../rules/MP001-timer-after-unload.ts'
 import { mp02 } from '../rules/MP002-component-style-isolation.ts'
@@ -91,6 +109,24 @@ export const guards: Guard[] = [
   aq20,
   aq21,
   aq22,
+  aq23,
+  aq24,
+  aq25,
+  aq26,
+  aq27,
+  aq28,
+  aq29,
+  aq30,
+  aq31,
+  aq32,
+  aq33,
+  aq34,
+  aq35,
+  aq37,
+  aq38,
+  aq36,
+  aq39,
+  aq40,
   // 小程序域（`miniprogram/`）：宿主是双线程模型 + 页面栈 + 样式隔离，
   // 它的缺陷几乎都不报错——只在真机上表现成「样式没了/点了没反应/整块白掉」。
   mp01,

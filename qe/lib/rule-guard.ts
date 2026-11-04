@@ -59,6 +59,14 @@ export interface RuleCtx {
   facts: SchemaFacts
   /** 读项目内文件（相对 root）；不存在返回 null */
   readFile(rel: string): string | null
+  /**
+   * 本次射程内的全部文件清单（相对 root，已过滤 applies）。
+   *
+   * 跨文件分析场景用：需要同时扫 lib/ 下"候选函数"和 app/ 下"调用点"时，
+   * 在逐文件 analyze 回调里没有文件列表，靠此字段一次性遍历。
+   * 单文件规则不必读它；它在 RuleCtx 创建时就已准备好（files 过滤 happens-before ruleCtx 构造）。
+   */
+  files: string[]
 }
 
 export interface RuleFixture {
@@ -218,25 +226,26 @@ export function toGuard(spec: RuleSpec): Guard {
     async run(ctx) {
       const facts = await loadSchemaFacts(ctx.root, ctx.config)
       const options = (ctx.config.rules?.[spec.id] ?? {}) as Record<string, unknown>
-      const ruleCtx: RuleCtx = {
+      const baseRuleCtx = {
         root: ctx.root,
         config: ctx.config,
         options,
         facts,
         // 同步读：规则是纯函数，签名里不该出现 Promise；每规则每文件调用 0~2 次，代价可忽略
-        readFile: (rel) => {
+        readFile: (rel: string) => {
           try {
             return readFileSync(path.join(ctx.root, rel), 'utf8')
           } catch {
             return null
           }
         },
-      }
+        files: [] as string[], // 先占位，算完 files 后回填
+      } satisfies RuleCtx
 
       // 规则自己声明的不适用原因（自由文本）。分类留了升级口：返回值是对象时用它给的 code，
       // 只写字符串则统一落 AQ_NOT_CLASSIFIED —— 后者集中出现本身就是待办信号，
       // 按规则 id 派生 code 会让「射程条件还只写在散文里」显得已经分好类了。
-      const declared = spec.notApplicable?.(ruleCtx) ?? null
+      const declared = spec.notApplicable?.(baseRuleCtx) ?? null
       if (declared) {
         throw typeof declared === 'string'
           ? new NotApplicable(SKIP_CODE_UNCLASSIFIED, declared)
@@ -244,7 +253,7 @@ export function toGuard(spec: RuleSpec): Guard {
       }
 
       const roots = [...ctx.config.source.roots]
-      for (const dir of spec.extraRoots?.(ruleCtx) ?? []) {
+      for (const dir of spec.extraRoots?.(baseRuleCtx) ?? []) {
         if (dir && !roots.includes(dir)) roots.push(dir)
       }
       const files = (await collectFiles(ctx.root, roots, ctx.config)).filter((rel) => spec.applies(rel))
@@ -254,6 +263,8 @@ export function toGuard(spec: RuleSpec): Guard {
           `射程内 0 个文件（roots=${roots.join(',')}）：0 命中不代表无缺陷`,
         )
       }
+      // 回填文件清单，让跨文件分析规则可用
+      const ruleCtx: RuleCtx = { ...baseRuleCtx, files }
 
       const findings: Finding[] = []
       let checked = 0

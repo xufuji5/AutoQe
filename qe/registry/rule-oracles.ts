@@ -172,6 +172,142 @@ export const RULE_ORACLES: Record<string, RuleOracle> = {
     guardedBy: ['INV-META-06'],
   },
 
+  /* ---------- AQ023–AQ025：Next.js 性能瓶颈（静态可判的"可并行/可缓存"形态） ---------- */
+  aq23: {
+    source:
+      'lib/jobs 目录下导出 async 函数的函数体 × Prisma 读操作词表命中 × 是否含 cache() 包裹（机器可枚举）' +
+      ' × app/** 下 layout/page Server Component 文件里对该函数的精确标识符调用次数（≥2 次即命中）',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-01'],
+  },
+  aq24: {
+    source:
+      '项目根 next.config.* 文件 × 已知性能杀开关清单（键路径 + 要关的值 + Next 修复起始版本）' +
+      ' × package.json 中 dependencies.next 字段解析出 major.minor（三部分都是可机器枚举的文本）',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-02'],
+  },
+  aq25: {
+    source:
+      'async 函数体内 Promise.all 解构绑定名集合 × 其后 ≤5 行独立 await 的实参中是否引用绑定名' +
+      '（纯语法位置 + 标识符边界判定；不追踪 helper 函数内部隐式依赖）',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-03'],
+  },
+
+  /* ---------- AQ026–AQ028：UI 文案（2026-10-29 skinlab UI 优化批） ---------- */
+  aq26: {
+    source:
+      '.tsx/.jsx 组件文件内双引号字符串字面量 × 中文字符计数（正则 [\\u4e00-\\u9fa5]）' +
+      ' × 短位标签白名单（Hint/Disclosure/title/button/p/span） × 阈值（title 15 / 其他 20）',
+    kind: 'machine',
+    guardedBy: ['INV-UI-01'],
+  },
+  aq27: {
+    source:
+      '.tsx/.jsx 组件文件内双/单引号字符串字面量 × 中文字符计数（正则 [\\u4e00-\\u9fa5]） × 阈值 50',
+    kind: 'machine',
+    guardedBy: ['INV-UI-02'],
+  },
+  aq28: {
+    source:
+      'ctx.files 中 app/ + components/ 下 .tsx/.jsx 文件的集合 × 每个文件内 10-50 中文字字符串字面量' +
+      '（排除 FAQ 长答案和反引号模板） × 跨文件 Set 交集统计',
+    kind: 'machine',
+    guardedBy: ['INV-UI-03'],
+  },
+  aq29: {
+    source:
+      '.tsx/.jsx 组件文件的 className 属性字符串 × Tailwind arbitrary value 正则 [xxx]' +
+      ' × 颜色值判定（#hex/rgba?/hsla?） + 像素值判定（\\d+px）× 视觉属性白名单（border/bg/text/rounded/leading/tracking/ring/divide/outline/shadow）',
+    kind: 'machine',
+    guardedBy: ['INV-UI-04'],
+  },
+  aq30: {
+    source:
+      '.ts/.tsx/.js/.jsx 文件 × Prisma 调用正则 prisma.Model.findFirst|findUnique|create' +
+      ' × 函数体配平同函数内配对 × schema.unique 交叉（可选，降误报）',
+    kind: 'machine',
+    guardedBy: ['INV-DB-01'],
+  },
+  aq31: {
+    source:
+      '.ts/.tsx/.js/.jsx 文件 × Prisma 读调用正则（findMany|findFirst|findUnique）' +
+      ' × select: 存在性检查 × schema.model.fields 里 Text/Json/@db.Text 重列判定',
+    kind: 'machine',
+    guardedBy: ['INV-DB-02'],
+  },
+  aq32: {
+    source:
+      'Server Component 文件（app/**/layout|page）× await auth() 等身份调用正则' +
+      ' × 目录子树分组（app/admin/ vs app/merchant/）× ≥2 个文件命中判定',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-03'],
+  },
+  aq33: {
+    source:
+      'Server Component 文件 × async function 签名 + await 检测 × 非 Prisma 读 + 无 unstable_cache/React.cache 包装',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-04'],
+  },
+  aq34: {
+    source:
+      'Server Component 文件 × 顶层（depth=0）new Date()/Date.now() 正则扫描' +
+      '（跳过花括号块内的、跳过字符串/模板串内的）',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-05'],
+  },
+  aq35: {
+    source:
+      '全文件 unstable_cache tags: [...] 选项 + 注释 // cacheTag 提取 × 全文件 revalidateTag 调用收集' +
+      ' × declared - called 差集 = 未失效的 cacheTag',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-06'],
+  },
+  aq37: {
+    source:
+      'schema.prisma 注释块含 "partial/Prisma 不支持/只落迁移" 关键词' +
+      ' × 从 backtick/CREATE INDEX/CONSTRAINT 语法提取索引名' +
+      ' × prisma/migrations/**/migration.sql 里的 CREATE INDEX 集合' +
+      ' × declared - built 差集 = 声明了但没落地的 partial index',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-07'],
+  },
+  aq38: {
+    source:
+      '.env / .env.example / .env.production 里 DATABASE_URL 提取' +
+      ' × URL query 参数 connection_limit 检查' +
+      ' × 无 connection_limit → warn；connection_limit < 5 → warn',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-08'],
+  },
+  aq36: {
+    source:
+      'schema.prisma 解析每个 Model 的 @@index 字段列表' +
+      ' × 全代码 Prisma where 条件提取 (多字段集合)' +
+      ' × 检查复合索引前导列是否覆盖' +
+      ' × 无覆盖 → info 提示 (无法静态判定查询频率)',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-09'],
+  },
+  aq39: {
+    source:
+      'schema.prisma 找有 expiresAt/validUntil 的 Model' +
+      ' × 注释里显式"无清理 job/合规保留"的自动跳过' +
+      ' × jobs/**/*.ts 扫 deleteMany/updateMany 调用' +
+      ' × 有 expiresAt 但零清理 → info 提示',
+    kind: 'machine',
+    guardedBy: ['INV-PERF-10'],
+  },
+  aq40: {
+    source:
+      '剥注释后扫 apiError(\'<CODE>\', …) 调用（CODE 属 options.codes 或默认 *_REQUIRED 后缀）' +
+      ' × 第二实参为字符串字面量（三种引号）且含 ≥2 对《》书名号（枚举清单；单一文档名放行——真仓首跑 4 条误报全是单文档名）' +
+      ' × 命中 = 闸文案硬编码枚举；实参为标识符/调用（单源函数）放行',
+    kind: 'machine',
+    guardedBy: ['INV-UI-05'],
+  },
+
   /* ---------- MP001–MP008：小程序域（宿主时序/样式作用域/配置表） ---------- */
   mp01: {
     source: '定时器回调体的 AST × 页面/组件生命周期钩子（onUnload/detached）与存活短路的出现位置',
