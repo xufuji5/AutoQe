@@ -307,6 +307,34 @@ export const RULE_ORACLES: Record<string, RuleOracle> = {
     kind: 'machine',
     guardedBy: ['INV-UI-05'],
   },
+  aq41: {
+    source:
+      '剥注释后正则扫描（eval( / new Function( / setTimeout(\'string\' / setInterval(\'string\'），' +
+      '命中任一即报；文件过滤排除 node_modules、测试/演示目录',
+    kind: 'machine',
+    guardedBy: ['INV-SEC-10'],
+  },
+  aq42: {
+    source:
+      '剥注释后正则扫描（.innerHTML= / .outerHTML= / dangerouslySetInnerHTML），' +
+      '命中后检查命中点 ±3 行内是否有 sanitize/DOMPurify/xss 调用——有则放行，无则报；文件仅限 .tsx/.jsx/.vue',
+    kind: 'machine',
+    guardedBy: ['INV-SEC-11'],
+  },
+  aq43: {
+    source:
+      '剥注释后统计单文件内 as any / as unknown / : any 的出现次数，' +
+      '任一阈值满足（as any+as unknown ≥3、: any ≥5、总行数 >200 且密度 >5%）即报 warn；仅限 .ts/.tsx 源码（不含 .d.ts）',
+    kind: 'machine',
+    guardedBy: ['INV-TYPE-01'],
+  },
+  aq44: {
+    source:
+      '剥注释后逐行追踪条件语句（if/for/while/switch）的花括号嵌套深度，' +
+      '当前深度 >0 时检测本行是否含 use[A-Z]\w*\( 形式的 Hook 调用——有则报；仅限 .tsx/.jsx',
+    kind: 'machine',
+    guardedBy: ['INV-UI-06'],
+  },
 
   /* ---------- MP001–MP008：小程序域（宿主时序/样式作用域/配置表） ---------- */
   mp01: {

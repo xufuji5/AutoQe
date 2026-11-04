@@ -346,6 +346,28 @@ export const registry: Invariant[] = [
     decidedAt: '2026-10-28',
   },
 
+  /* ---------- 安全执行边界与净化（2026-11-04 通用化批，抽自外部安全扫描器） ---------- */
+  {
+    id: 'INV-SEC-10',
+    statement: '业务源码不得出现 eval / new Function / setTimeout(string) / setInterval(string) 动态执行入口；确实需要动态执行时，改用数据驱动的分发（handlers[name]）或函数形式计时器',
+    defectClasses: ['安全', '执行边界幻觉'],
+    guard: 'qe:guard:aq41',
+    badSample: 'qe/rules/AQ041-unsafe-dynamic-exec.ts 的 fixtures（eval 用户内容 / new Function / setTimeout 字符串形式）',
+    status: 'enforced',
+    gap: '不覆盖反射调用 `(name[op])(arg)` 形态；Vite/Rspack 插件内部 new Function 在 node_modules 射程外；不覆盖 JSON 解析器的 eval',
+    decidedAt: '2026-11-04',
+  },
+  {
+    id: 'INV-SEC-11',
+    statement: 'innerHTML / outerHTML 直接赋值或 React dangerouslySetInnerHTML 必须紧邻 sanitize（DOMPurify / valid-html），否则等于把任意字符串交给浏览器执行',
+    defectClasses: ['XSS', '安全'],
+    guard: 'qe:guard:aq42',
+    badSample: 'qe/rules/AQ042-xss-innerhtml.ts 的 fixtures（innerHTML 用户内容 / dangerouslySetInnerHTML 无净化）',
+    status: 'partial',
+    gap: '只看「附近（±3 行）有没有 sanitize 调用」，不追踪数据流；Vue v-html 指令不在射程（源码里写 v-html 而非 innerHTML）；contenteditable 自身 innerHTML 不属于源码写入',
+    decidedAt: '2026-11-04',
+  },
+
   /* ---------- Prisma / PostgreSQL 并发正确性 ---------- */
   {
     id: 'INV-DB-01',
@@ -744,6 +766,28 @@ export const registry: Invariant[] = [
     status: 'partial',
     gap: '只认 apiError 一族发射器（options.emitters 可扩展）；第二实参经中间变量两跳传入的不在射程；非 *_REQUIRED 后缀的闸码须显式进 options.codes',
     decidedAt: '2026-11-03',
+  },
+  {
+    id: 'INV-UI-06',
+    statement: 'React Hook 必须在组件函数顶层无条件调用（不在 if/else/for/while/switch 内），保证每次渲染顺序完全一致；违反则 React 内部状态槽位错位',
+    defectClasses: ['UI 正确性', '运行时崩溃'],
+    guard: 'qe:guard:aq44',
+    badSample: 'qe/rules/AQ044-hook-in-condition.ts 的 fixtures（if 块里调 useState / for 循环里调 useRef）',
+    status: 'enforced',
+    gap: '只在 tsx/jsx 文件生效（非 React 项目无影响）；三元表达式条件里调 Hook 不在射程（useXxx(cond)）；自定义 Hook 内部再调 Hook 不报（只要顺序稳定）',
+    decidedAt: '2026-11-04',
+  },
+
+  /* ---------- TypeScript 类型系统完整度（2026-11-04 通用化批，抽自外部安全扫描器） ---------- */
+  {
+    id: 'INV-TYPE-01',
+    statement: '单个 .ts/.tsx 文件内 `as any` + `as unknown` 合计 ≥ 3 次、或 `: any` 标注 ≥ 5 次、或总行数 > 200 且 hatch 密度 > 5%，说明类型系统被当作噪音处理；需先定义正确 interface 或 ambient 声明',
+    defectClasses: ['类型退化', '运行时错误', 'AI 幻觉'],
+    guard: 'qe:guard:aq43',
+    badSample: 'qe/rules/AQ043-type-escape-hatch.ts 的 fixtures（as any 三次 → 超过阈值 / : any 五次 → 超过阈值）',
+    status: 'partial',
+    gap: '是 warn 而非 red（质量退化，不是安全问题）；不覆盖 `// @ts-ignore` / `// @ts-expect-error` 注释；不追踪 any 断言的必要性（可能确实是第三方 SDK 无类型）',
+    decidedAt: '2026-11-04',
   },
 
   /* ---------- DB 真相源与性能（2026-10-29 [项目 A] DB 治理批） ---------- */

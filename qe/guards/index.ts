@@ -55,6 +55,10 @@ import { aq38 } from '../rules/AQ038-db-url-no-connection-limit.ts'
 import { aq36 } from '../rules/AQ036-missing-compound-index.ts'
 import { aq39 } from '../rules/AQ039-expiring-table-no-cleanup-job.ts'
 import { aq40 } from '../rules/AQ040-gate-copy-literal.ts'
+import { aq41 } from '../rules/AQ041-unsafe-dynamic-exec.ts'
+import { aq42 } from '../rules/AQ042-xss-innerhtml.ts'
+import { aq43 } from '../rules/AQ043-type-escape-hatch.ts'
+import { aq44 } from '../rules/AQ044-hook-in-condition.ts'
 import { aq15 } from './aq15-reuse-opportunity.ts'
 import { mp01 } from '../rules/MP001-timer-after-unload.ts'
 import { mp02 } from '../rules/MP002-component-style-isolation.ts'
@@ -127,6 +131,10 @@ export const guards: Guard[] = [
   aq36,
   aq39,
   aq40,
+  aq41,
+  aq42,
+  aq43,
+  aq44,
   // 小程序域（`miniprogram/`）：宿主是双线程模型 + 页面栈 + 样式隔离，
   // 它的缺陷几乎都不报错——只在真机上表现成「样式没了/点了没反应/整块白掉」。
   mp01,
