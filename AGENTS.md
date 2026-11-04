@@ -9,6 +9,36 @@
 Quality = constraint density: **invariants > test cases**. A test case asks "is this path correct?"; an invariant asks "does this hold always?".
 Tests enumerate; AI defects are structural, and enumeration never catches up with structure. So: establish constraints first, write business logic second, run tests last.
 
+## 0.5 开源中立宪法（一票否决）
+
+> AutoQe 是**开源、中立、普适**的软件质量工程引擎。这条原则高于一切，任何冲突都以此为准。
+
+### 核心承诺
+
+1. **引擎仓永不携带任何被扫描项目的特定信息**：
+   - ❌ 项目代号（如 skinlab、试点 A/B）
+   - ❌ 真实文件路径（如 `app/[feature]/layout.tsx`、`catalog.ts:499`）
+   - ❌ 真实表名/列名（如 `msg_unread`、`ingredientsRaw`）
+   - ❌ 行业绑定术语（如 支付处理、合作关联、后台操作、合规机构）
+   - ❌ 内部审计读数（如 619 条、472 错误码）
+   - ❌ 任何能反查到具体仓库或公司的坐标
+
+2. **每次升级引擎时，必须回答：这条通用化了吗？**
+   - 从 [项目 A] 扫出的新缺陷模式 → 抽象规则 → 名字和 provenance 里不能提 [项目 A]
+   - 规则示例用中性占位：`[项目 B]`、`某文件`、`[expiring-table]`、`实体条目`
+   - 技术洞察（"Next.js 15.2 起修了 Turbopack 缓存原子性"）**是**通用的，可以留
+
+3. **失败的代价**：
+   - leak-project-info 守卫**必须对本仓跑绿**（errors=0）才能合并
+   - 任何项目特定信息一旦入库，就是**永久历史债务**（git 历史不可撤回）
+   - 本仓的 `.gitignore` 已把配置/报告/状态文件排除在版本库之外
+
+### 这条原则的由来
+
+> 多次发生：把宿主项目信息直接写进规则注释、registry badSample、skills provenance。
+> 后果：开源工具反变成了宿主项目的镜像（"某垂直行业专用"），而非普适引擎。
+> 修复成本：89 文件、237+ 替换、一次全量重写。教训：**宪法必须写在最前面，并且有自动守卫**。
+
 ## 1. Five collaboration protocols
 
 1. **AI fills the middle; never touch the boundaries.** Schema, contracts, enums, error codes, and state machines are generated from a single source; the AI writes only the middle business logic. If a boundary is still handwritten, build the boundary generator first.

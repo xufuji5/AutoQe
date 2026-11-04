@@ -598,9 +598,10 @@ export const inv20 = defineGuard({
     const sources = await collectorFor(ctx.config).loadSources(ctx.root, ctx.config)
     // 鉴权词表与公共路由与 aq06 同源（lib/auth-evidence.ts）：同一概念只有一个答案。
     const authVocab = authVocabulary(ctx.config)
-    const validatePatterns = ctx.config.boundaries?.validatePatterns?.length
-      ? ctx.config.boundaries.validatePatterns
-      : DEFAULT_VALIDATE
+    const validatePatterns = [
+      ...DEFAULT_VALIDATE,
+      ...(ctx.config.boundaries?.validatePatterns ?? []),
+    ]
     const mutationMethods = ctx.config.boundaries?.mutationMethods?.length
       ? ctx.config.boundaries.mutationMethods
       : DEFAULT_MUTATION
@@ -700,11 +701,14 @@ export const inv20 = defineGuard({
       const body = bodyTextOf(fn, ast)
       // 登记可精确到方法：同一文件里匿名面（能力发现 GET）与鉴权面（写入 POST）并存时，
       // 整文件豁免会把鉴权面的覆盖一起丢掉，那是把判据关掉而不是把误报消掉。
-      const publicRule = publicRoutes.find(
-        (r) =>
-          (entry.rel === r.file || entry.rel.endsWith('/' + r.file)) &&
-          (!r.methods?.length || r.methods.map((m) => m.toUpperCase()).includes(entry.name)),
-      )
+      // 支持目录前缀（文件路径以 '/' 结尾时匹配目录下所有路由，其余精确匹配）。
+      const publicRule = publicRoutes.find((r) => {
+        const file = r.file
+        const fileMatch = file.endsWith('/')
+          ? (entry.rel + '/').startsWith(file)
+          : entry.rel === file || entry.rel.endsWith('/' + file)
+        return fileMatch && (!r.methods?.length || r.methods.map((m) => m.toUpperCase()).includes(entry.name))
+      })
       const isPublic = Boolean(publicRule)
       if (publicRule) {
         matchedPublic.add(publicRule.file)

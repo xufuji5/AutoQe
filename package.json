@@ -112,7 +112,7 @@
     "qe:skills": "node qe/cli.ts skills --check",
     "qe:ratchet": "node qe/cli.ts run",
     "qe:ratchet:update": "node qe/cli.ts ratchet-update",
-    "qe:ci": "npm run typecheck && npm run test:invariants && npm run qe:skills && npm run test:triage && npm run test:isolation && npm run test:spec && npm run test:oracle && npm run test:idem-triage && npm run qe:report"
+    "qe:ci": "npm run typecheck && npm run qe:guard:leak && npm run test:invariants && npm run qe:skills && npm run test:triage && npm run test:isolation && npm run test:spec && npm run test:oracle && npm run test:idem-triage && npm run qe:report"
   },
   "dependencies": {
     "typescript": "5.9.3"

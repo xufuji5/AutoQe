@@ -438,6 +438,15 @@ export const aq05 = toGuard({
       const hasTenant = tenantKeys.some((k) => lower.includes(k.toLowerCase()))
       if (hasTenant) continue
 
+      // 多租户封装器：tenantTx(identity, tx => { tx.$queryRaw... }) 这种形态
+      // 租户条件由外层封装器注入，tx.$queryRaw 里不再写 tenantId 列名——
+      // 静态看不见但语义上是安全的（同理 withTenant / withScope / tenantScope 等命名）。
+      // 只看当前文件调用链（同文件一跳），跨文件不追（保守：宁可多报）。
+      const tenantWrapper = /\b(tenantTx|withTenant|withScope|tenantScope|inTenant|withTenantContext)\s*\(/i.test(
+        code.slice(0, at),
+      )
+      if (tenantWrapper) continue
+
       // 分档（第一版不分档，在[项目 A] 上报了 162 处「跨租户」——绝大多数是全站聚合统计，
       // 那是设计意图而不是洞。判据必须能区分「按 id 取单条」和「COUNT(*) 全站」）。
       // 以 select 开头的语句一律按读处理（`SELECT ... FOR UPDATE` 里的 update 不是写语句）
