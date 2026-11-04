@@ -4,7 +4,7 @@ title: 异常被吞（空 catch / 只打日志）
 status: rule
 rules: [AQ003]
 defectClass: 错误收口 / 静默失败
-provenance: 试点 A catch-taxonomy 守卫 + 试点 B 多次「回滚失败被吞」事故
+provenance: [项目 A] catch-taxonomy 守卫 + [项目 B] 多次「回滚失败被吞」事故
 question: 每一个 catch，失败之后有没有人会被叫醒？
 ---
 

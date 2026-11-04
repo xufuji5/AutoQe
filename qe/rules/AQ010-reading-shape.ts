@@ -173,7 +173,7 @@ export const aq10 = toGuard({
   impact:
     'PostgreSQL 给无别名聚合列起名就是函数名：两列 `COUNT(*)` 都叫 `count`，行对象化（Prisma / JSON / ORM 映射）时后一个覆盖前一个。读数静默变错、不抛错，且错的方向常是「看起来更合理」的那一侧',
   provenance:
-    '试点 C（2026-10）：对账脚本用两条未别名的 COUNT 同时取分子与分母，对象化后同名键互相覆盖，读数从「0 / 19」显示成「19」；连续两轮人工复核都没发现，直到用另一条 SQL 交叉验算才暴露',
+    '[项目 C]（2026-10）：对账脚本用两条未别名的 COUNT 同时取分子与分母，对象化后同名键互相覆盖，读数从「0 / 19」显示成「19」；连续两轮人工复核都没发现，直到用另一条 SQL 交叉验算才暴露',
   applies(rel) {
     if (!/\.(?:ts|tsx|js|jsx|mjs|cjs|mts)$/.test(rel)) return false
     if (/(^|\/)node_modules\//.test(rel)) return false

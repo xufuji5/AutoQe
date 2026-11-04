@@ -4,7 +4,7 @@ title: 假绿锚点（判据自身恒真/边界过宽）
 status: rule
 rules: [AQ007]
 defectClass: 判据失效 / 假绿
-provenance: 试点 A 多次「守卫恒真」返工（前缀匹配命中 /admin/ops-events-x、手数分组漏两条）+ 试点 B 守卫自检
+provenance: [项目 A] 多次「守卫恒真」返工（前缀匹配命中 /admin/ops-events-x、手数分组漏两条）+ [项目 B] 守卫自检
 question: 这条断言在什么情况下会红？如果答不出来，它就不是断言。
 ---
 

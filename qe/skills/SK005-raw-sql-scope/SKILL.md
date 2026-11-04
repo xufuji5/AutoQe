@@ -4,7 +4,7 @@ title: 原生 SQL 缺租户收敛 / 拼接注入
 status: rule
 rules: [AQ005]
 defectClass: 跨租户越权 / SQL 注入
-provenance: 试点 B scripts/lib/raw-sql-scan.ts（原生 SQL 是主要数据通路）+ 试点 A 多租户盘点
+provenance: [项目 B] scripts/lib/raw-sql-scan.ts（原生 SQL 是主要数据通路）+ [项目 A] 多租户盘点
 question: 每一句手写 SQL，租户条件写在 where 里还是指望调用方记得？
 ---
 

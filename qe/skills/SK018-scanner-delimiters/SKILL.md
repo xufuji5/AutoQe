@@ -4,7 +4,7 @@ title: 扫描器不认识正则字面量，于是把文档当代码
 status: rule
 rules: [AQ001, AQ003, AQ007]
 defectClass: 判据失效 / 误报
-provenance: 2026-10-24 外部试跑：试点 C 首轮 AQ001 的 8 处命中里 7 处落在 JSDoc 示例行上
+provenance: 2026-10-24 外部试跑：[项目 C] 首轮 AQ001 的 8 处命中里 7 处落在 JSDoc 示例行上
 question: 这个命中行，剥注释之后还是代码吗？我实际验过，还是只是「看起来该被剥掉」？
 ---
 
@@ -12,7 +12,7 @@ question: 这个命中行，剥注释之后还是代码吗？我实际验过，�
 
 ## 血案
 
-试点 C 首轮 AQ001（裸 `req.json()`）报了 8 处，**7 处在注释里**：
+[项目 C] 首轮 AQ001（裸 `req.json()`）报了 8 处，**7 处在注释里**：
 
 ```ts
  *   ① `const body = await req.json()` → `body.orderId`

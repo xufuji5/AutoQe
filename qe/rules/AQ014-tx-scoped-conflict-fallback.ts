@@ -164,7 +164,7 @@ export const aq14 = toGuard({
   impact:
     '兜底写在事务内 = 没有兜底：P2002 之后事务已 aborted，回读再抛 25P02，冒成 500；调用方（支付回调/队列）见 500 重试又撞同一个键 → 循环失败',
   provenance:
-    '外部试点 D（2026-10-25）：资金账本唯一写入口的幂等快路在并发下不存在，输家撞唯一索引后把 P2002 冒成 500；修复时必须把 catch 移到事务外层，事务内回读实测报 `current transaction is aborted`',
+    '外部[项目 D]（2026-10-25）：资金账本唯一写入口的幂等快路在并发下不存在，输家撞唯一索引后把 P2002 冒成 500；修复时必须把 catch 移到事务外层，事务内回读实测报 `current transaction is aborted`',
   applies(rel) {
     return /\.(ts|tsx|js|mjs|mts|cjs)$/.test(rel)
   },

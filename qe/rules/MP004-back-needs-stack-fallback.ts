@@ -68,7 +68,7 @@ export const mp04 = toGuard({
   ],
   impact:
     '页面栈深度为 1（分享落地、扫码直达、reLaunch 之后）时 navigateBack 静默失败：不抛错、不中断，用户停在原地，看起来像「点了没反应」',
-  provenance: '试点 B（2026-10）：分享卡片直达提交页后提交成功，自动返回必然失败，用户停在已完成页且无任何反应',
+  provenance: '[项目 B]（2026-10）：分享卡片直达提交页后提交成功，自动返回必然失败，用户停在已完成页且无任何反应',
   applies(rel) {
     return isMpSource(rel, /\.(?:js|ts)$/)
   },

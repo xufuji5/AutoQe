@@ -209,7 +209,7 @@ export const POLICIES: Record<string, Policy> = {
       'An internal project codename appears in text that may be published.',
       '出现内部项目代号，而这段文本可能对外。',
     ),
-    action: L('Replace with a neutral codename.', '换成中性代号（如 外部试点 A/B）。'),
+    action: L('Replace with a neutral codename.', '换成中性代号（如 外部[项目 A]/B）。'),
     options: [L('A Replace with a neutral codename', 'A 换中性代号')],
   },
   DOMAIN_VOCAB: {

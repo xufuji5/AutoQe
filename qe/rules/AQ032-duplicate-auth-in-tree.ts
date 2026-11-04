@@ -5,26 +5,26 @@
  *
  * 在 Next.js App Router 里：
  *
- *   // app/admin/layout.tsx
+ *   // app/[admin]/layout.tsx
  *   const session = await auth()     // 跑一次 auth()
  *
- *   // app/admin/accounts/page.tsx
+ *   // app/[admin]/accounts/page.tsx
  *   const session = await auth()     // 又跑一次 auth()（同一请求里）
  *
- *   // app/admin/audit/page.tsx
+ *   // app/[admin]/audit/page.tsx
  *   const session = await auth()     // 第三次...
  *
- * skinlab admin/ 目录下 layout + 9 个 page 都这样 → 同一请求里 auth() 跑 10 次。
+ * [项目 A] admin/ 目录下 layout + 9 个 page 都这样 → 同一请求里 auth() 跑 10 次。
  * auth() 底层要查 JWT/读 session cookie + 可能查 DB 校验 → 这 10 次不是便宜的操作。
  *
  * ## 解法
  *
  *   // 方案 A：layout 统一调一次，通过 props 下发
- *   // app/admin/layout.tsx
+ *   // app/[admin]/layout.tsx
  *   const session = await auth()     // 只跑这一次
  *   return <AdminLayout session={session}>{children}</AdminLayout>
  *
- *   // app/admin/accounts/page.tsx （变成 Client Component 或从父组件拿 session）
+ *   // app/[admin]/accounts/page.tsx （变成 Client Component 或从父组件拿 session）
  *   const role = props.session?.user?.role
  *
  *   // 方案 B：用 React cache 包一层（如果 auth() 能进 cache 就更简洁）
@@ -34,7 +34,7 @@
  *
  * 1. 扫所有 layout.tsx / page.tsx Server Component 文件
  * 2. 找 `await auth()` / `await getSession()` / `const xxx = await auth()` 形态的裸调用
- * 3. 按"目录子树"分组：app/admin/layout.tsx 和 app/admin 下的 page.tsx 算同一子树
+ * 3. 按"目录子树"分组：app/[admin]/layout.tsx 和 app/admin 下的 page.tsx 算同一子树
  * 4. 同一子树里 auth() 出现 ≥2 次 → warn
  * 5. 同一子树里只有 layout 有 auth()（page 没有）→ 放行（正确模式）
  *
@@ -42,7 +42,7 @@
  *
  * ✅ 静态可判：正则 + 路径分组
  * ✅ 跨仓可复现：Next.js App Router 项目通用
- * ✅ 有坏样本：skinlab admin/ layout + 9 page 全裸调 auth()
+ * ✅ 有坏样本：[项目 A] admin/ layout + 9 page 全裸调 auth()
  * ✅ 误报可控：只认 `await auth(` 精确形态 + 目录子树分组 ≥2
  */
 
@@ -61,9 +61,9 @@ function isServerComponent(rel: string): boolean {
 }
 
 /** 归组：找 rel 最近的祖先 layout.tsx 所在目录。
- *  app/admin/layout.tsx → app/admin
- *  app/admin/users/page.tsx → app/admin（最近的 layout 根）
- *  app/admin/users/sub/page.tsx → app/admin/users（如果那层有 layout）
+ *  app/[admin]/layout.tsx → app/admin
+ *  app/[admin]/users/page.tsx → app/admin（最近的 layout 根）
+ *  app/[admin]/users/sub/page.tsx → app/[admin]/users（如果那层有 layout）
  *  app/api/xxx/route.ts → null（API 路由不归组）
  */
 function findLayoutRoot(rel: string, allFiles: Set<string>): string | null {
@@ -94,7 +94,7 @@ export const aq32 = toGuard({
     '同一 Next.js App Router 子树内多个 layout/page 直接 await auth()，' +
     '同一次 HTTP 请求里 auth() 会被重复执行（通常涉及 JWT 验证 + session 查 DB）。' +
     '正确模式是 layout 统一调一次通过 props 下发，或用 React.cache() 包一层。',
-  provenance: '2026-10-29 skinlab admin/ 治理：admin/layout.tsx + 9 个 page.tsx 全部裸调 await auth() → 同请求 10 次 auth() 执行。',
+  provenance: '2026-10-29 [项目 A] admin/ 治理：admin/layout.tsx + 9 个 page.tsx 全部裸调 await auth() → 同请求 10 次 auth() 执行。',
 
   applies(rel) {
     // 只对第一个 Server Component 文件返回 true，其余短路 → 性能优化 + 避免重复报告
@@ -170,19 +170,19 @@ export const aq32 = toGuard({
       name: 'layout + 2 page 都裸调 auth()（该报）',
       expect: 'warn',
       files: {
-        'app/admin/layout.tsx':
+        'app/[admin]/layout.tsx':
           "import { auth } from '@/auth'\n" +
           'export default async function AdminLayout({ children }: { children: React.ReactNode }) {\n' +
           '  const session = await auth()\n' +
           '  return <div>{children}</div>\n' +
           '}\n',
-        'app/admin/users/page.tsx':
+        'app/[admin]/users/page.tsx':
           "import { auth } from '@/auth'\n" +
           'export default async function UsersPage() {\n' +
           '  const session = await auth()\n' +
           '  return <div>users</div>\n' +
           '}\n',
-        'app/admin/orders/page.tsx':
+        'app/[admin]/orders/page.tsx':
           "import { auth } from '@/auth'\n" +
           'export default async function OrdersPage() {\n' +
           '  const session = await auth()\n' +
@@ -194,13 +194,13 @@ export const aq32 = toGuard({
       name: '只有 layout 调 auth()，page 通过 props 拿（不该报）',
       expect: 'green',
       files: {
-        'app/admin/layout.tsx':
+        'app/[admin]/layout.tsx':
           "import { auth } from '@/auth'\n" +
           'export default async function AdminLayout({ children }: { children: React.ReactNode }) {\n' +
           '  const session = await auth()\n' +
           '  return <AdminShell session={session}>{children}</AdminShell>\n' +
           '}\n',
-        'app/admin/users/page.tsx':
+        'app/[admin]/users/page.tsx':
           'import { AdminShell } from "../_components/admin-shell"\n' +
           'export default function UsersPage() {\n' +
           '  return <div>users</div>\n' +
@@ -211,13 +211,13 @@ export const aq32 = toGuard({
       name: '两个不同子树各只有 1 个 auth()（不该报：不同子树各自独立）',
       expect: 'green',
       files: {
-        'app/admin/layout.tsx':
+        'app/[admin]/layout.tsx':
           "import { auth } from '@/auth'\n" +
           'export default async function AdminLayout({ children }: { children: React.ReactNode }) {\n' +
           '  const session = await auth()\n' +
           '  return <div>{children}</div>\n' +
           '}\n',
-        'app/merchant/layout.tsx':
+        'app/[feature]/layout.tsx':
           "import { auth } from '@/auth'\n" +
           'export default async function MerchantLayout({ children }: { children: React.ReactNode }) {\n' +
           '  const session = await auth()\n' +

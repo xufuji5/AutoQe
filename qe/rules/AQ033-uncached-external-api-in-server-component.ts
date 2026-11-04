@@ -8,7 +8,7 @@
  * 如果子 Server Component 直接 await 外部 HTTP API（微信出码、支付签名、第三方服务），
  * 即使 page 被 ISR 缓存了，这个子组件每次仍会重新执行、重新发 HTTP 请求。
  *
- * skinlab 真实案例：首页 scan-card.tsx 是 async Server Component，每次首页请求都同步等
+ * [项目 A] 真实案例：首页 scan-card.tsx 是 async Server Component，每次首页请求都同步等
  * 两次微信 API 往返（先 getAccessToken 再 getwxacodeunlimit）——生产 TTFB 2.9s 完全耗在这。
  * 讽刺的是根 page.tsx 写了注释"出码每小时重算一次（ISR）"，但 ScanCard 没走 ISR。
  *
@@ -64,7 +64,7 @@ export const aq33 = toGuard({
     'Next.js 的 export const revalidate 只对整个 page 生效，不影响子组件里的直接 async/await。' +
     '如果子 Server Component 直接 await 外部 HTTP API，即使 page 被 ISR 缓存了，这个子组件每次仍会重发请求。' +
     '解法：子组件内部用 unstable_cache 包装外部 API 调用。',
-  provenance: '2026-10-29 skinlab 性能批根因：scan-card.tsx 是 async Server Component，' +
+  provenance: '2026-10-29 [项目 A] 性能批根因：scan-card.tsx 是 async Server Component，' +
     '每次首页请求同步等两次微信 API 往返（getAccessToken + getwxacodeunlimit），' +
     '生产 TTFB 2.9s 完全耗在这里。page.tsx 写了 revalidate=3600 但子组件绕过了。',
 
@@ -114,7 +114,7 @@ export const aq33 = toGuard({
     {
       name: 'async Server Component 直调外部 HTTP（该报）',
       expect: 'warn',
-      rel: 'app/marketing/_components/scan-card.tsx',
+      rel: 'app/[marketing]/_components/scan-card.tsx',
       src:
         'async function ScanCard() {\n' +
         '  const buf = await getWxacodeUnlimit("pages/index/index", "home")\n' +
@@ -125,7 +125,7 @@ export const aq33 = toGuard({
     {
       name: '已包 unstable_cache（不该报）',
       expect: 'green',
-      rel: 'app/marketing/_components/scan-card.tsx',
+      rel: 'app/[marketing]/_components/scan-card.tsx',
       src:
         'import { unstable_cache } from "next/cache"\n' +
         'const getCachedQr = unstable_cache(async () => {\n' +
@@ -139,7 +139,7 @@ export const aq33 = toGuard({
     {
       name: 'async Server Component 调 Prisma（不该报：AQ023 覆盖）',
       expect: 'green',
-      rel: 'app/merchant/layout.tsx',
+      rel: 'app/[feature]/layout.tsx',
       src:
         'async function MerchantLayout() {\n' +
         '  const merchant = await prisma.merchant.findFirst({ where: { ownerUserId: "x" } })\n' +
@@ -149,7 +149,7 @@ export const aq33 = toGuard({
     {
       name: 'sync Server Component（不该报：没有 await 绕过 ISR）',
       expect: 'green',
-      rel: 'app/marketing/layout.tsx',
+      rel: 'app/[marketing]/layout.tsx',
       src:
         'export default function MarketingLayout({ children }: { children: React.ReactNode }) {\n' +
         '  return <div>{children}</div>\n' +
@@ -158,7 +158,7 @@ export const aq33 = toGuard({
     {
       name: 'async Server Component 只调 React.cache 包装的函数（不该报）',
       expect: 'green',
-      rel: 'app/admin/layout.tsx',
+      rel: 'app/[admin]/layout.tsx',
       src:
         "import { cache } from 'react'\n" +
         'const getAdmin = cache(async () => {\n' +

@@ -23,7 +23,7 @@ export const inv03 = defineGuard({
     const usages = collector.collectEnumUsages(all, schema, ctx.config)
     const calls = collector.collectCalls(all, schema, ctx.config)
     // 写调用的 data 若经变量/函数参数传入，字段覆盖未知：该模型上的枚举值可能就在那里产生，
-    // 不能据「字面量里没见到写」判死值（外部试点 A 的角色码、状态机都有这类写点）。
+    // 不能据「字面量里没见到写」判死值（外部[项目 A] 的角色码、状态机都有这类写点）。
     const unknownWriterModels = new Set(
       calls.filter((c) => c.kind === 'write' && c.fieldsUnknown).map((c) => c.model),
     )
@@ -59,7 +59,7 @@ export const inv03 = defineGuard({
             )
           } else if (others.length > 0) {
             // 同一个值既被读、又出现在映射表/常量数组这类非读写上下文：
-            // 产生路径可能经跨文件常量（外部试点 A 的 CORE_ROLE_CODES 就是这种），不能判死
+            // 产生路径可能经跨文件常量（外部[项目 A] 的 [enum-codes] 就是这种），不能判死
             findings.push(
               warn(
                 'AMBIGUOUS_PATH',

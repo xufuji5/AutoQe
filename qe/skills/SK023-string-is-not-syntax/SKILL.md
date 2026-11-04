@@ -4,7 +4,7 @@ title: 在字符串里找语法，等于给自己造了一个恒真入口
 status: rule
 rules: [AQ007]
 defectClass: 测试方法论 / 假绿
-provenance: 2026-10-24 外部试点 C：`assert('复用序列 [false,true,true]', ...)` 被「常量真断言」误报，正则吃到的是消息里的 `,true,`
+provenance: 2026-10-24 外部[项目 C]：`assert('复用序列 [false,true,true]', ...)` 被「常量真断言」误报，正则吃到的是消息里的 `,true,`
 question: 这条判据的匹配，有可能命中字符串内容吗？命中了以后还分得清是真语法吗？
 ---
 

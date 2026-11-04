@@ -4,7 +4,7 @@ title: 先查后写（check-then-act 竞态）
 status: rule
 rules: [AQ004]
 defectClass: 并发 A 类 / 状态与额度竞态
-provenance: 试点 A concurrency-patterns baseline（每轮 probe 都撞出「2 路恰串行」假绿）+ 试点 B 额度扣减事故
+provenance: [项目 A] concurrency-patterns baseline（每轮 probe 都撞出「2 路恰串行」假绿）+ [项目 B] 额度扣减事故
 question: 这个「先查存在再创建」的路径，两个请求同时进来会发生什么？
 ---
 

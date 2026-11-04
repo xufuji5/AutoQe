@@ -6,7 +6,7 @@
  * 短标签位（button/Hint/Disclosure summary/title 属性/p/span 等）
  * 本应承载 ≤20 字的帮助文本，实际塞了 30-80 字的完整段落：
  *
- *   - <Hint>80 字收款账户说明</Hint>
+ *   - <Hint>80 字收款实体条目说明</Hint>
  *   - <Disclosure summary="费率 / 排序加成 / 担保划付"> 内 <p>83 字权益叙事</p>
  *   - <p title="36 字补录占位说明">  title 本应 ≤15 字的 tooltip
  *   - SectionCard hint 属性直接塞 80 字字符串
@@ -24,7 +24,7 @@
  *
  * ✅ 静态可判：正则 + 中文字数计数
  * ✅ 跨仓可复现：React/Next.js 项目通用
- * ✅ 有坏样本：skinlab gold-upgrade-panel(83字) + account Hint(80字) + nmpa title(36字)
+ * ✅ 有坏样本：[项目 A] [upgrade-panel](83字) + account Hint(80字) + nmpa title(36字)
  * ✅ 误报可控：短位标签白名单 + 字数门槛
  */
 
@@ -122,7 +122,7 @@ export const aq26 = toGuard({
   level: 'warn',
   impact:
     '短标签位（Hint/Dclosure/title/p/button）本应承载 ≤20 字帮助文本，实际塞了 30-80 字完整段落，增加心智负担。短位只留核心信息（1 句话），细节挪到折叠/弹窗。',
-  provenance: '2026-10-29 skinlab UI 优化批：gold-upgrade-panel.tsx Disclosure 内 83 字 p 标签、' +
+  provenance: '2026-10-29 [项目 A] UI 优化批：[upgrade-panel].tsx Disclosure 内 83 字 p 标签、' +
     'account/page.tsx Hint 组件 80 字、admin/nmpa title 属性 36 字。',
 
   applies(rel) {
@@ -162,16 +162,16 @@ export const aq26 = toGuard({
     {
       name: 'Hint 组件塞 50 字（该报）',
       expect: 'warn',
-      rel: 'app/merchant/account/page.tsx',
+      rel: 'app/[feature]/account/page.tsx',
       src:
         'export default function Account() {\n' +
-        '  return <Hint label="分账收款账户说明">绑定即向微信发起接收方校验，成功才落库；后可换绑。货款直达你的微信商户号，平台不经手。</Hint>\n' +
+        '  return <Hint label="分账收款实体条目说明">绑定即向微信发起接收方校验，成功才落库；后可换绑。货款直达你的实体条目标识，平台不经手。</Hint>\n' +
         '}\n',
     },
     {
       name: 'Disclosure summary 塞 35 字（该报）',
       expect: 'warn',
-      rel: 'app/merchant/gold-panel.tsx',
+      rel: 'app/[feature]/gold-panel.tsx',
       src:
         'export function GoldPanel() {\n' +
         '  return <Disclosure summary="费率 0.6% 单笔保底 0.3 元客单五十以上按全额生效计算方式" title="金牌权益" />\n' +
@@ -180,28 +180,28 @@ export const aq26 = toGuard({
     {
       name: 'title 属性塞 36 字（该报）',
       expect: 'warn',
-      rel: 'app/admin/page.tsx',
+      rel: 'app/[admin]/page.tsx',
       src:
         'export default function Admin() {\n' +
-        '  return <p title="主体信息在平台设置维护营业执照住所地质量安全负责人缺省时报告内含补录占位">报告说明</p>\n' +
+        '  return <p title="主体信息在平台设置维护资质证明住所地质量安全负责人缺省时报告内含补录占位">报告说明</p>\n' +
         '}\n',
     },
     {
       name: '短文案正常（不该报）',
       expect: 'green',
-      rel: 'app/merchant/account/page.tsx',
+      rel: 'app/[feature]/account/page.tsx',
       src:
         'export default function Account() {\n' +
-        '  return <Hint label="收款账户">绑定微信商户号</Hint>\n' +
+        '  return <Hint label="收款实体条目">绑定实体条目标识</Hint>\n' +
         '}\n',
     },
     {
       name: 'button 塞长文案（该报）',
       expect: 'warn',
-      rel: 'app/admin/page.tsx',
+      rel: 'app/[admin]/page.tsx',
       src:
         'export default function Admin() {\n' +
-        '  return <button onClick={() => {}}>平台代你向微信申请特约商户审核通过后自动回填商户号</button>\n' +
+        '  return <button onClick={() => {}}>平台代你向微信申请合作方审核通过后自动回填实体条目标识</button>\n' +
         '}\n',
     },
   ],

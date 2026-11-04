@@ -359,7 +359,7 @@ export const aq05 = toGuard({
       'SQL 语义不解析：CTE、子查询、视图内的租户收敛不判定',
     ],
   impact: '单租户测试全绿，多租户上线后 A 能看到 B 的数据；Unsafe + 插值 = 直接注入',
-  provenance: "外部试点 B（2026-10）的原生 SQL 扫描器（该项目主要数据通路是手写 SQL）+ 外部试点 A 的多租户盘点",
+  provenance: "外部[项目 B]（2026-10）的原生 SQL 扫描器（该项目主要数据通路是手写 SQL）+ 外部[项目 A] 的多租户盘点",
   applies(rel) {
     if (!/\.(ts|tsx|mjs|mts)$/.test(rel)) return false
     if (/\.(test|spec)\./.test(rel)) return false
@@ -438,7 +438,7 @@ export const aq05 = toGuard({
       const hasTenant = tenantKeys.some((k) => lower.includes(k.toLowerCase()))
       if (hasTenant) continue
 
-      // 分档（第一版不分档，在试点 A 上报了 162 处「跨租户」——绝大多数是全站聚合统计，
+      // 分档（第一版不分档，在[项目 A] 上报了 162 处「跨租户」——绝大多数是全站聚合统计，
       // 那是设计意图而不是洞。判据必须能区分「按 id 取单条」和「COUNT(*) 全站」）。
       // 以 select 开头的语句一律按读处理（`SELECT ... FOR UPDATE` 里的 update 不是写语句）
       const isWrite = !/^\s*(?:select|with)\b/i.test(tpl) && /\b(insert\s+into|update|delete\s+from)\b/i.test(tpl)
@@ -464,7 +464,7 @@ export const aq05 = toGuard({
       }
       if (byId) {
         // 中置信：`${order.id}` 这类参数往往来自**已鉴权**的上下文（前面查过租户），
-        // 静态判据看不见那一步。首轮实测在试点 A 上 127 处里绝大多数属于这一类，
+        // 静态判据看不见那一步。首轮实测在[项目 A] 上 127 处里绝大多数属于这一类，
         // 所以它默认**不输出**，要用请显式开 reportById —— 否则真注入会被噪声淹掉。
         if (ctx.options.reportById === true) {
           hits.push({

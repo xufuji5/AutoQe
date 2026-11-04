@@ -4,7 +4,7 @@ title: 路由导出但无鉴权
 status: rule
 rules: [AQ006]
 defectClass: 鉴权缺失 / 后台裸奔
-provenance: 试点 A api-ownership 登记表（每条都是「新加的 route 忘了走 admin 校验」）+ 试点 B 权限矩阵回填
+provenance: [项目 A] api-ownership 登记表（每条都是「新加的 route 忘了走 admin 校验」）+ [项目 B] 权限矩阵回填
 question: 这个新加的接口，谁能调？答案写在哪一行代码里？
 ---
 

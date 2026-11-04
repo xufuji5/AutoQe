@@ -296,7 +296,7 @@ export const aq17 = toGuard({
     '冒烟/红队脚本没有强制 mock 环境就打真实外部接口：跑一次就产生真实出账/真实消息/真实短信；' +
     '崩溃往往发生在后面的对账断言之前，脚本自己打印「清理完成」，把「没验到」伪装成「验过了」',
   provenance:
-    '试点 D（2026-10）：三条冒烟脚本缺 force-mock-env，真实调用出账与订阅消息网关；其中一条崩溃发生在脏账 E2E 之前，后面 8 面静态对账一条没跑，finally 仍打印清理完成',
+    '[项目 D]（2026-10）：三条冒烟脚本缺 force-mock-env，真实调用出账与订阅消息网关；其中一条崩溃发生在脏账 E2E 之前，后面 8 面静态对账一条没跑，finally 仍打印清理完成',
   applies(rel) {
     if (!/\.(?:ts|tsx|js|jsx|mjs|cjs|mts)$/.test(rel)) return false
     if (/(^|\/)node_modules\//.test(rel)) return false

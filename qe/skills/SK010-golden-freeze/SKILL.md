@@ -4,7 +4,7 @@ title: 口径冻结与 golden 样本
 status: manual
 rules: []
 defectClass: 语义漂移 / 口径漂移
-provenance: 试点 A 核心指标口径冻结（两条口径同批改）+ 多轮「同一个数三个文档三种写法」
+provenance: [项目 A] 核心指标口径冻结（两条口径同批改）+ 多轮「同一个数三个文档三种写法」
 question: 这个数字的口径写在哪一份文件里？样本覆盖了几个不同取值？
 ---
 

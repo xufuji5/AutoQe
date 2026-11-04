@@ -119,7 +119,7 @@ const PROBES: Probe[] = [
     re: /\.startsWith\s*\(\s*['"][^'"]*['"]\s*\)/g,
     impact: '前缀匹配做边界判定：`/admin` 会命中 `/admin-evil`，该拒绝的请求被放过',
     // 首轮实测教训：只看「同一行出现 path/url」会把 URL 规范化（`.startsWith('/')`）
-    // 全算成权限判定，试点 A 上一次报了 76 处、几乎全是误报。
+    // 全算成权限判定，[项目 A] 上一次报了 76 处、几乎全是误报。
     // 真正的信号是**同一行有权限语义词**，且参数不是一个泛化的分隔符。
     keep: (line) =>
       /\b(allow|allowed|deny|forbidden|authorized|unauthorized|permit|canAccess|isAllowed)\b/i.test(line) &&
@@ -148,7 +148,7 @@ export const aq07 = toGuard({
       '不判断言是否覆盖了该覆盖的维度（覆盖度是另一条判据的事）',
     ],
   impact: '判据绿得没有意义：本该红的时候全绿，比没有判据更危险（人会相信它）',
-  provenance: "外部试点 A 多次「守卫恒真」返工（前缀匹配把 /admin-x 当成 /admin、手数分组漏两条）+ 外部试点 B 的守卫自检",
+  provenance: "外部[项目 A] 多次「守卫恒真」返工（前缀匹配把 /admin-x 当成 /admin、手数分组漏两条）+ 外部[项目 B] 的守卫自检",
   applies(rel) {
     if (!/\.(ts|tsx|js|mjs|mts|mjsx?)$/.test(rel)) return false
     if (/(^|\/)node_modules\//.test(rel)) return false

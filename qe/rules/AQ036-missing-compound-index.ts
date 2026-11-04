@@ -5,11 +5,11 @@
  *
  * 报告 v1.0 §2.1 指出 Order 表 GMV 时间窗查询 `where: { merchantId, paidAt: { gte } }` 高频出现
  * 但 schema 只有 @@index([merchantId, status]) 和单独 @@index([paidAt])，没有 [merchantId, paidAt] 复合索引。
- * PG 只能用两个单列索引 bitmap AND，而复合索引可以 index-only scan 快速定位商户时间窗。
+ * PG 只能用两个单列索引 bitmap AND，而复合索引可以 index-only scan 快速定位实体条目时间窗。
  *
- * skinlab 已验证的真实命中 (schema.prisma):
+ * [项目 A] 已验证的真实命中 (schema.prisma):
  *   - Order 表有 [merchantId, status] 和单独 [paidAt], 但 GMV 聚合查询 where: { merchantId, paidAt: { gte } }
- *   - catalog.ts:499 / wallet-ledger.ts:184 / dashboard-insight.ts:126 三处
+ *   - [catalog].ts:499 / [ledger].ts:184 / [insight].ts:126 三处
  *
  * ## 判据
  *
@@ -30,7 +30,7 @@ import { stripComments } from '../lib/code-only.ts'
 import { lineOf } from '../lib/rule-helpers.ts'
 import path from 'node:path'
 
-// 常见复合索引需求模板: 这些字段组合在电商系统里出现必有索引
+// 常见复合索引需求模板: 这些字段组合在交易系统系统里出现必有索引
 // (merchantId + 时间窗) / (status + 时间窗) / (merchantId + status)
 // 精确匹配 schema 里是否存在覆盖前导列的复合索引
 
@@ -274,7 +274,7 @@ export const aq36 = toGuard({
     'Prisma where 里同时过滤 merchantId + paidAt 等多个字段，但 schema 里没有覆盖这些前导列的复合索引。' +
     'PG 只能走 bitmap AND 多个单列索引或 seq scan — GMV 时间窗查询慢。' +
     '提示级：静态分析无法判定查询频率，由人决定是否加索引（过度建索引拖写路径是另一种缺陷）。',
-  provenance: '2026-10-29 skinlab DB 优化包 v1.0 §2.1: Order 表 GMV 查询 where: { merchantId, paidAt } 至少 5 处，' +
+  provenance: '2026-10-29 [项目 A] DB 优化包 v1.0 §2.1: Order 表 GMV 查询 where: { merchantId, paidAt } 至少 5 处，' +
     '当前只有 [merchantId, status] + 单独 [paidAt]，缺 [merchantId, paidAt] 复合索引。',
 
   applies() { return true },

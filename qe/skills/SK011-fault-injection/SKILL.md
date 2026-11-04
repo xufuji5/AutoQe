@@ -4,7 +4,7 @@ title: 依赖故障注入（假降级的四种形态）
 status: manual
 rules: []
 defectClass: 降级不可达 / 语义错 / 无界 / 静默
-provenance: 试点 A 58 §八 轴1 + fault-inject 探针（存储 / 消息 / 第三方 API / 登录四条外部链路）
+provenance: [项目 A] 58 §八 轴1 + fault-inject 探针（存储 / 消息 / 第三方 API / 登录四条外部链路）
 question: 这条链路的降级代码，你真的见它执行过一次吗？
 ---
 

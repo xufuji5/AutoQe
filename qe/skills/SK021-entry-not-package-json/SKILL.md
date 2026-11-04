@@ -4,7 +4,7 @@ title: 入口不只有 package.json
 status: rule
 rules: [INV-CORE-13]
 defectClass: 误报 / 判据口径
-provenance: 2026-10-24 外部试跑：试点 C 的「脚本无入口」报了 119 处，项目实际用发现制 harness 全量跑
+provenance: 2026-10-24 外部试跑：[项目 C] 的「脚本无入口」报了 119 处，项目实际用发现制 harness 全量跑
 question: 我说这个脚本「跑不到」，是我查过它的所有入口，还是只查了我认识的那一种入口？
 ---
 
@@ -12,7 +12,7 @@ question: 我说这个脚本「跑不到」，是我查过它的所有入口，�
 
 ## 血案
 
-「在盘但无入口」在试点 C 报了 119 处，其中 64 是 `scripts/smoke-*.ts`。
+「在盘但无入口」在[项目 C] 报了 119 处，其中 64 是 `scripts/smoke-*.ts`。
 项目的总闸门长这样：
 
 ```ts

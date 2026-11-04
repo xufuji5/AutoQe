@@ -1,7 +1,7 @@
 /**
  * 三投影一致性（磁盘 / 索引 / HEAD）：回答「这个结论对哪个树成立」。
  *
- * 抽取自 试点 A `scripts/invariants/commit-readiness.ts` 的投影抽象。
+ * 抽取自 [项目 A] `scripts/invariants/commit-readiness.ts` 的投影抽象。
  *
  * ## 为什么这不是 git 技巧，而是判据可信度问题
  *

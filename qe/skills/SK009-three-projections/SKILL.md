@@ -4,7 +4,7 @@ title: 三投影：磁盘 / 索引 / HEAD
 status: manual
 rules: []
 defectClass: 判据看错树 / 发版遗漏
-provenance: 试点 A commit-readiness（迁移写了没 add、索引漏文件）+ 多次「本机绿、干净检出红」
+provenance: [项目 A] commit-readiness（迁移写了没 add、索引漏文件）+ 多次「本机绿、干净检出红」
 question: 这次「绿了」，是对磁盘、索引还是 HEAD 绿的？
 ---
 

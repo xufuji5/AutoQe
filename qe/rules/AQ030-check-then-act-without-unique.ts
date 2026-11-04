@@ -10,7 +10,7 @@
  * 但 findFirst 只在单线程里"看不见"，两个并发请求都 findFirst=null → 同时 create → 静默两条。
  * **唯一能原子防重的是 DB 层的 @unique / @@unique**——应用层先查后建是竞态条件。
  *
- * skinlab 真实案例：NotificationTask.ensureHumanTask 原为 findFirst+create，
+ * [项目 A] 真实案例：[Model].[method] 原为 findFirst+create，
  * 上线后发现静默重复 → 加 @@unique([eventId, reason]) 换 upsert。
  *
  * ## 判据
@@ -172,7 +172,7 @@ export const aq30 = toGuard({
   impact:
     '两个并发请求同时 findFirst 返回 null → 同时 create → 静默两条重复行。' +
     '唯一能原子防重的是 DB 层 @unique/@@unique。应用层先查后建是竞态条件。',
-  provenance: '2026-10-29 skinlab 回顾：NotificationTask.ensureHumanTask 原 findFirst+create，' +
+  provenance: '2026-10-29 [项目 A] 回顾：[Model].[method] 原 findFirst+create，' +
     '发现静默重复才加 @@unique([eventId, reason]) 换 upsert。',
 
   applies(rel) {

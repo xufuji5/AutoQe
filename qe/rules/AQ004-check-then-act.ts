@@ -18,7 +18,7 @@
  * 这个数字是从实战来的：判据太宽（整函数）会把「查 A 表、建 B 表」算成竞态；
  * 太窄（同一行）会漏掉中间夹着校验的常见写法。40 行是覆盖率与误报的折中，
  * 写在配置里（`windowLines`），不同项目可以调 —— 但**不许按文件设例外**。
- * ## 首轮外部试跑撞出来的误报（试点 B 55 处 → 收紧后剩个位数）
+ * ## 首轮外部试跑撞出来的误报（[项目 B] 55 处 → 收紧后剩个位数）
  * 初版只要求「同一模型 find 过、又在 40 行内 create 过」，于是把**导入器**判成了竞态：
  *   `const step = await processStep.findFirst({ where: { tenantId, assetId, stepNo } })`
  *   后面紧跟 `processStep.create(...)` —— 这是「按业务键查上一个工序，再建下一个工序」，
@@ -44,7 +44,7 @@ const GUARD_RE =
   /(upsert|\$transaction|P2002|onConflict|ON\s+CONFLICT|FOR\s+UPDATE|forUpdate|pg_advisory|pg_try_advisory|advisory_xact_lock|@@unique|@unique|唯一约束|unique constraint|duplicate|isUniqueViolation|uniqueViolation|UniqueConstraintError|23505)/i
 /**
  * look-behind：临界区通常长这样 —— 先拿锁，再 find，再判空写。
- * 只在 find 之后找守卫会漏掉「锁在 find 前一行」的正确写法（外部试点 A 基线实测 4 处假红）。
+ * 只在 find 之后找守卫会漏掉「锁在 find 前一行」的正确写法（外部[项目 A] 基线实测 4 处假红）。
  * 只认真正能阻止并发的形态，不认裸 `$transaction`（事务本身不防双写）。
  */
 const PRE_GUARD_RE = /(pg_advisory|pg_try_advisory|advisory_xact_lock|FOR\s+UPDATE|forUpdate|LOCK\s+TABLE|SERIALIZABLE)/i
@@ -60,7 +60,7 @@ export const aq04 = toGuard({
       '目标表有唯一约束时默认不报（含迁移 SQL 里的 CREATE UNIQUE INDEX；并发会撞库报错，属另一类缺陷）',
     ],
   impact: '并发下双写：唯一约束挡住变 500，没约束的表留下两条重复记录（不报错，更坏）',
-  provenance: "外部试点 A 的并发基线（每轮探针都撞出「2 路请求恰好串行」的假绿）+ 外部试点 B（2026-10）的额度扣减事故",
+  provenance: "外部[项目 A] 的并发基线（每轮探针都撞出「2 路请求恰好串行」的假绿）+ 外部[项目 B]（2026-10）的额度扣减事故",
   applies(rel) {
     if (!/\.(ts|tsx|js|mjs|mts)$/.test(rel)) return false
     if (/\.(test|spec)\./.test(rel)) return false
@@ -94,7 +94,7 @@ export const aq04 = toGuard({
       const to = Math.min(lines.length, from + windowLines)
       const window = lines.slice(from, to).join('\n')
       // 锁/行锁/串行化通常在 find 之前，向后看与 forward window 同宽（默认 40 行）。
-      // 固定 12 行实测不够：外部试点 A 的「先拿锁 → 校验职责互斥 → 再查重」中间隔着 20+ 行校验。
+      // 固定 12 行实测不够：外部[项目 A] 的「先拿锁 → 校验职责互斥 → 再查重」中间隔着 20+ 行校验。
       // 用保留字符串的原文，否则 SQL 锁词被 maskStringBodies 抹掉。
       const preWindow = rawLines.slice(Math.max(0, from - windowLines), from).join('\n')
       if (PRE_GUARD_RE.test(preWindow)) continue
@@ -106,7 +106,7 @@ export const aq04 = toGuard({
       if (GUARD_RE.test(window)) continue
       // 目标表有唯一约束 ⇒ 并发双写被数据库挡住（表现是 500，不是静默两条记录）。
       // 这仍然是个问题，但它**不是本规则要抓的那一类**（本规则抓静默双写）。
-      // 试点 B 试跑实证：同一仓里两张形状相同的表，一张有复合唯一键（租户 + 业务键 + 版本），
+      // [项目 B] 试跑实证：同一仓里两张形状相同的表，一张有复合唯一键（租户 + 业务键 + 版本），
       // 另一张没有 —— 它们在代码里长得一模一样，只有 schema 能区分。
       const declared = (ctx.options.uniqueModels ?? []) as string[]
       const hasUnique = declared.includes(model) || (modelUniquesOf(ctx).get(model.toLowerCase())?.length ?? 0) > 0

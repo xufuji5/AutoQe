@@ -6,7 +6,7 @@
  * 同一个 10-50 中文字的提示文案被 3+ 个组件文件复制粘贴，
  * 修改时要改 N 处、漏改即出现前后不一致：
  *
- *   - "图形验证码已使用，请按新图重新输入" — 4 处（join/apply-form、login、phone-rebind、merchant/login）
+ *   - "图形验证码已使用，请按新图重新输入" — 4 处（join/apply-form、login、phone-rebind、[feature]/login）
  *   - "请先阅读并同意《用户服务协议》《隐私政策》《纠纷处理与赔付规范》" — 3 处（join/apply-form、onboarding-flow、onboarding-resume）
  *   - "获取图形验证码失败，请检查网络连接" — 3 处
  *
@@ -54,7 +54,7 @@ export const aq28 = toGuard({
   level: 'warn',
   impact:
     '同一 10-50 中文字文案在 3+ 组件文件中复制粘贴。修改时要改 N 处、漏改即出现前后不一致。抽成共享常量（如 lib/copy.ts）一处改全局生效。',
-  provenance: '2026-10-29 skinlab UI 优化批：7 组 ≥3 处重复文案（图形验证码提示、协议同意文案、换绑手机号说明、支付通道维护、认证过期、网络错误等）。',
+  provenance: '2026-10-29 [项目 A] UI 优化批：7 组 ≥3 处重复文案（图形验证码提示、协议同意文案、换绑手机号说明、支付通道维护、认证过期、网络错误等）。',
 
   applies(_rel) {
     return true // 跨文件分析，analyze 里自己过滤
@@ -122,7 +122,7 @@ export const aq28 = toGuard({
       name: '相同协议文案 3 个组件（该报）',
       expect: 'warn',
       files: {
-        'app/join/apply-form.tsx':
+        'app/[signup]/apply-form.tsx':
           'export default function Apply() {\n' +
           '  const AGREEMENT = "请先阅读并同意用户服务协议隐私政策纠纷处理与赔付规范后再提交"\n' +
           '  return <Checkbox label={AGREEMENT}>同意</Checkbox>\n' +
@@ -158,7 +158,7 @@ export const aq28 = toGuard({
       expect: 'green',
       files: {
         'app/a.tsx': "export default function A() { return <p>欢迎加入</p> }\n",
-        'app/b.tsx': "export default function B() { return <p>创建店铺</p> }\n",
+        'app/b.tsx': "export default function B() { return <p>创建合作方</p> }\n",
         'app/c.tsx': "export default function C() { return <p>提交审核</p> }\n",
       },
     },
@@ -167,11 +167,11 @@ export const aq28 = toGuard({
       expect: 'green',
       files: {
         'app/join/page.tsx':
-          'const FAQ_A = { a: "退款由微信支付从你自己的商户账户直接原路退回货款尚未结算的走账户内的冻结资金已结算的从账户余额扣出平台全程不经手不沉淀不占用资金" }\n',
+          'const FAQ_A = { a: "资金处理由支付平台从你自己的实体条目实体条目直接原路退回货款尚未资金流转的走实体条目内的冻结资金已资金流转的从实体条目余额扣出平台全程不经手不沉淀不占用资金" }\n',
         'app/help/page.tsx':
-          'const FAQ_B = { a: "退款由微信支付从你自己的商户账户直接原路退回货款尚未结算的走账户内的冻结资金已结算的从账户余额扣出平台全程不经手不沉淀不占用资金" }\n',
-        'app/admin/page.tsx':
-          'const FAQ_C = { a: "退款由微信支付从你自己的商户账户直接原路退回货款尚未结算的走账户内的冻结资金已结算的从账户余额扣出平台全程不经手不沉淀不占用资金" }\n',
+          'const FAQ_B = { a: "资金处理由支付平台从你自己的实体条目实体条目直接原路退回货款尚未资金流转的走实体条目内的冻结资金已资金流转的从实体条目余额扣出平台全程不经手不沉淀不占用资金" }\n',
+        'app/[admin]/page.tsx':
+          'const FAQ_C = { a: "资金处理由支付平台从你自己的实体条目实体条目直接原路退回货款尚未资金流转的走实体条目内的冻结资金已资金流转的从实体条目余额扣出平台全程不经手不沉淀不占用资金" }\n',
       },
     },
   ],

@@ -94,7 +94,7 @@ export const aq34 = toGuard({
     'Server Component 顶层（模块作用域）new Date()/Date.now() 会在每次 ISR 重验证时得到不同值，' +
     '破坏缓存效率；构建期 prerender 时 new Date() 可能拿到不可预期的值。' +
     '正确做法：时间值应该在 async 函数组件的请求级内部获取。',
-  provenance: '2026-10-29 skinlab 性能批附录六：/join/apply page 顶层 new Date() 导致 Next prerender 错误。',
+  provenance: '2026-10-29 [项目 A] 性能批附录六：/join/apply page 顶层 new Date() 导致 Next prerender 错误。',
 
   applies(rel) {
     return isServerComponent(rel)

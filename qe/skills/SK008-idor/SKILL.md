@@ -4,7 +4,7 @@ title: 按 ID 直取无归属校验（IDOR）
 status: rule
 rules: [AQ008]
 defectClass: 越权访问 / 水平权限
-provenance: 试点 A 多租户盘点 + 试点 B 权限矩阵（RLS 之外的应用层归属校验缺口）
+provenance: [项目 A] 多租户盘点 + [项目 B] 权限矩阵（RLS 之外的应用层归属校验缺口）
 question: 这个 id 是请求给的，凭什么认为它属于调用者？
 ---
 

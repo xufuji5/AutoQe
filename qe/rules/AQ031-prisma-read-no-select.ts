@@ -10,8 +10,8 @@
  * Prisma 默认 fetch **所有列**。如果 Order 表有 `@db.Text`（description）或 `Json`（metadata），
  * 这些大列每次都要从 DB 拉过网络、反序列化进内存——列表页可能只展示 orderNo + status。
  *
- * skinlab 的 Product 表：ingredientsRaw（@db.Text）、description（@db.Text）、bundleComponents（Json）、
- * comboRefs（Json）。任何 findMany / findFirst / findUnique 不加 select 都会把这些 Blob 拉过来。
+ * [项目 A] 的 [产品表]：[column]（@db.Text）、description（@db.Text）、[column]（Json）、
+ * [column]（Json）。任何 findMany / findFirst / findUnique 不加 select 都会把这些 Blob 拉过来。
  *
  * ## 判据
  *
@@ -91,8 +91,8 @@ export const aq31 = toGuard({
   impact:
     'findMany/findFirst/findUnique 不加 select → Prisma 拉全列，含 Text/Json Blob 字段时 I/O 爆炸。' +
     '列表页只展示 2-3 列却拉了 20 列里的 description、metadata 大字段。',
-  provenance: '2026-10-29 skinlab 回顾：Product schema 有 ingredientsRaw(@db.Text)/description(@db.Text)/' +
-    'bundleComponents(Json)/comboRefs(Json)，任何 findMany 不加 select 都会拉过来。',
+  provenance: '2026-10-29 [项目 A] 回顾：Product schema 有 [column](@db.Text)/description(@db.Text)/' +
+    '[column](Json)/[column](Json)，任何 findMany 不加 select 都会拉过来。',
 
   applies(rel) {
     return isComponentRel(rel)

@@ -4,7 +4,7 @@ title: 读数必须自报（禁止手数）
 status: manual
 rules: []
 defectClass: 测量方式漂移
-provenance: 试点 A 2026-10-22 血案：真值 13/0，三份文档写成 13 → 11 → 13
+provenance: [项目 A] 2026-10-22 血案：真值 13/0，三份文档写成 13 → 11 → 13
 question: 这个数字是程序打印的，还是人数出来的？分母是多少？
 ---
 

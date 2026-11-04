@@ -76,7 +76,7 @@ export const aq12 = toGuard({
     '生产源码直接引用假数据模块：不报错、类型也对，本地看起来一切正常，只是线上多了一份假数据参与渲染。' +
     '这类残留不会自己消失——接口接上之后那条 import 通常没人记得删',
   provenance:
-    '试点 B（2026-10）：页面先接 mock 数据上线演示，接口接通后 import 未删；线上详情页长期展示三条示例数据，无人察觉，直到对账时发现「有数据的记录」与「接口返回」对不上',
+    '[项目 B]（2026-10）：页面先接 mock 数据上线演示，接口接通后 import 未删；线上详情页长期展示三条示例数据，无人察觉，直到对账时发现「有数据的记录」与「接口返回」对不上',
   applies(rel) {
     if (!/\.(?:ts|tsx|js|jsx|mjs|cjs|mts)$/.test(rel)) return false
     if (/(^|\/)node_modules\//.test(rel)) return false

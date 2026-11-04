@@ -4,7 +4,7 @@
  * 泛化后三种命中形态（从轻到重）：
  *
  *   1. 基础形态（warn）：2+ Server Component 调同一个 async DB 读函数 + 未包 cache
- *      skinlab 样本：getMerchantAccessContext 被 layout + store/page 双调（已修）
+ *      [项目 A] 样本：getAccessContext 被 layout + store/page 双调（已修）
  *
  *   2. 时间参数形态（info → 已有 warn 基础上追加提示）：
  *      函数签名带 date/day/today/period 等时间形参 → 建议 memoize + 短 TTL
@@ -12,7 +12,7 @@
  *
  *   3. 身份获取形态（warn）：函数体含 auth()/getSession()/getUserFromRequest()
  *      → 身份函数应是 request 级 cache 的首要目标
- *      skinlab admin/layout.tsx + 9 个 page.tsx 都直接 auth() → 同请求跑 10 次
+ *      [项目 A] admin/layout.tsx + 9 个 page.tsx 都直接 auth() → 同请求跑 10 次
  *
  * 解法：export const X = cache(async () => { ... })。
  * 同请求内 N→1 次 DB 往返。
@@ -105,8 +105,8 @@ export const aq23 = toGuard({
   impact:
     '同一请求里 2+ 个 Server Component 调同一条异步 DB 读函数，但函数没包 React.cache()。' +
     'Next App Router 每次路由切换重跑 Server Component 树，这份查询会被重复执行。',
-  provenance: '2026-10-29 Web3 团长后台性能批：lib/merchant/members.ts getMerchantAccessContext ' +
-    '被 app/merchant/layout.tsx 和 app/merchant/store/page.tsx 同时调用，每次切换 2 次 DB 往返 → 包 React.cache 合并。',
+  provenance: '2026-10-29 Web3 [项目 B]性能批：lib/[entity]/members.ts getAccessContext ' +
+    '被 app/[feature]/layout.tsx 和 app/[feature]/store/page.tsx 同时调用，每次切换 2 次 DB 往返 → 包 React.cache 合并。',
 
   applies(rel) {
     // 射程：lib/jobs 的导出函数 + app 的 Server Component（我们需要同时看两者，
@@ -213,21 +213,21 @@ export const aq23 = toGuard({
       name: 'lib 导出 async DB 读，layout + page 双调用未缓存（该报）',
       expect: 'warn',
       files: {
-        'lib/merchant/members.ts':
+        'lib/[entity]/members.ts':
           "import { prisma } from '@/lib/prisma'\n" +
-          'export async function getMerchantAccessContext() {\n' +
+          'export async function getAccessContext() {\n' +
           '  return await prisma.merchantMember.findFirst({ where: { userId: "x" } })\n' +
           '}\n',
-        'app/merchant/layout.tsx':
-          "import { getMerchantAccessContext } from '@/lib/merchant/members'\n" +
+        'app/[feature]/layout.tsx':
+          "import { getAccessContext } from '@/lib/[entity]/members'\n" +
           'export default async function Layout({ children }: { children: React.ReactNode }) {\n' +
-          '  const ctx = await getMerchantAccessContext()\n' +
+          '  const ctx = await getAccessContext()\n' +
           '  return <div>{children}</div>\n' +
           '}\n',
-        'app/merchant/store/page.tsx':
-          "import { getMerchantAccessContext } from '@/lib/merchant/members'\n" +
+        'app/[feature]/store/page.tsx':
+          "import { getAccessContext } from '@/lib/[entity]/members'\n" +
           'export default async function StorePage() {\n' +
-          '  const ctx = await getMerchantAccessContext()\n' +
+          '  const ctx = await getAccessContext()\n' +
           '  return <div>{ctx?.merchant.name}</div>\n' +
           '}\n',
       },
@@ -236,21 +236,21 @@ export const aq23 = toGuard({
       name: '已包 React.cache()（不该报）',
       expect: 'green',
       files: {
-        'lib/merchant/members.ts':
+        'lib/[entity]/members.ts':
           "import { cache } from 'react'\nimport { prisma } from '@/lib/prisma'\n" +
-          'export const getMerchantAccessContext = cache(async () => {\n' +
+          'export const getAccessContext = cache(async () => {\n' +
           '  return await prisma.merchantMember.findFirst({ where: { userId: "x" } })\n' +
           '})\n',
-        'app/merchant/layout.tsx':
-          "import { getMerchantAccessContext } from '@/lib/merchant/members'\n" +
+        'app/[feature]/layout.tsx':
+          "import { getAccessContext } from '@/lib/[entity]/members'\n" +
           'export default async function Layout({ children }: { children: React.ReactNode }) {\n' +
-          '  const ctx = await getMerchantAccessContext()\n' +
+          '  const ctx = await getAccessContext()\n' +
           '  return <div>{children}</div>\n' +
           '}\n',
-        'app/merchant/store/page.tsx':
-          "import { getMerchantAccessContext } from '@/lib/merchant/members'\n" +
+        'app/[feature]/store/page.tsx':
+          "import { getAccessContext } from '@/lib/[entity]/members'\n" +
           'export default async function StorePage() {\n' +
-          '  const ctx = await getMerchantAccessContext()\n' +
+          '  const ctx = await getAccessContext()\n' +
           '  return <div>{ctx?.merchant.name}</div>\n' +
           '}\n',
       },
@@ -259,13 +259,13 @@ export const aq23 = toGuard({
       name: '只被 1 个 Server Component 调用（不该报）',
       expect: 'green',
       files: {
-        'lib/merchant/members.ts':
+        'lib/[entity]/members.ts':
           "import { prisma } from '@/lib/prisma'\n" +
           'export async function onlyOneCaller() {\n' +
           '  return await prisma.merchant.findFirst({ where: { id: "x" } })\n' +
           '}\n',
-        'app/merchant/layout.tsx':
-          "import { onlyOneCaller } from '@/lib/merchant/members'\n" +
+        'app/[feature]/layout.tsx':
+          "import { onlyOneCaller } from '@/lib/[entity]/members'\n" +
           'export default async function Layout({ children }: { children: React.ReactNode }) {\n' +
           '  const ctx = await onlyOneCaller()\n' +
           '  return <div>{children}</div>\n' +
@@ -281,7 +281,7 @@ export const aq23 = toGuard({
           'export async function trendDaily(days: number) {\n' +
           '  return await prisma.order.findMany({ where: { createdAt: { gte: new Date(Date.now() - days * 86400_000) } } })\n' +
           '}\n',
-        'app/admin/dashboard/page.tsx':
+        'app/[admin]/dashboard/page.tsx':
           "import { trendDaily } from '@/lib/analytics/trend'\n" +
           'export default async function Dashboard() {\n' +
           '  const data = await trendDaily(30)\n' +
@@ -299,7 +299,7 @@ export const aq23 = toGuard({
           '  const session = await auth()\n' +
           '  return await prisma.user.findUnique({ where: { id: session?.user?.id } })\n' +
           '}\n',
-        'app/admin/layout.tsx':
+        'app/[admin]/layout.tsx':
           "import { getUserFromSession } from '@/lib/auth/session'\n" +
           'export default async function AdminLayout({ children }: { children: React.ReactNode }) {\n' +
           '  const user = await getUserFromSession()\n' +
@@ -317,7 +317,7 @@ export const aq23 = toGuard({
           '  const session = await auth()\n' +
           '  return await prisma.user.findUnique({ where: { id: session?.user?.id } })\n' +
           '})\n',
-        'app/admin/layout.tsx':
+        'app/[admin]/layout.tsx':
           "import { getUserFromSession } from '@/lib/auth/session'\n" +
           'export default async function AdminLayout({ children }: { children: React.ReactNode }) {\n' +
           '  const user = await getUserFromSession()\n' +
@@ -334,13 +334,13 @@ export const aq23 = toGuard({
           'export async function writeAudit() {\n' +
           '  await prisma.auditLog.create({ data: { action: "x" } })\n' +
           '}\n',
-        'app/merchant/layout.tsx':
+        'app/[feature]/layout.tsx':
           "import { writeAudit } from '@/lib/audit/log'\n" +
           'export default async function Layout({ children }: { children: React.ReactNode }) {\n' +
           '  await writeAudit()\n' +
           '  return <div>{children}</div>\n' +
           '}\n',
-        'app/merchant/store/page.tsx':
+        'app/[feature]/store/page.tsx':
           "import { writeAudit } from '@/lib/audit/log'\n" +
           'export default async function StorePage() {\n' +
           '  await writeAudit()\n' +

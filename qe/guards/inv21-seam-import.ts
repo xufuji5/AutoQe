@@ -28,7 +28,7 @@ const SERVER_ONLY_SPECS: { test: RegExp; why: string }[] = [
 /**
  * 服务端实现特征：先剥注释，只认代码形态。
  * 旧实现直接在原文里找 `@prisma/client`，把「注释里描述这个包」的文件判成服务端实现
- * （外部试点 A 基线：components/ui.tsx 的注释触发 13 条假红）。
+ * （外部[项目 A] 基线：components/ui.tsx 的注释触发 13 条假红）。
  */
 function serverishText(text: string): boolean {
   const code = stripComments(text)

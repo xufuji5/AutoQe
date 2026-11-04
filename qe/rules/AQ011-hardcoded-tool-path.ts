@@ -100,7 +100,7 @@ export const aq11 = toGuard({
   impact:
     '干净 checkout（worktree / CI 浅克隆）里没有 node_modules：写死的 CLI 路径不存在 ⇒ 子进程零输出 ⇒ 常被误读成「被测代码抛穿了」，探针结论缺失与真实缺陷混为一谈',
   provenance:
-    '试点 C（2026-10）：同一批内两次栽在「夹具取 CLI 路径」上——先是写死 node_modules 绝对路径（worktree 里零输出被读成被测代码异常），修法第一版又假设 process.argv[1] 是运行时 CLI（实际是被重写后的脚本路径）',
+    '[项目 C]（2026-10）：同一批内两次栽在「夹具取 CLI 路径」上——先是写死 node_modules 绝对路径（worktree 里零输出被读成被测代码异常），修法第一版又假设 process.argv[1] 是运行时 CLI（实际是被重写后的脚本路径）',
   applies(rel) {
     if (!/\.(?:ts|tsx|js|jsx|mjs|cjs|mts)$/.test(rel)) return false
     if (/(^|\/)node_modules\//.test(rel)) return false

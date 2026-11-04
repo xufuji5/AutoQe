@@ -37,12 +37,12 @@ export const aq02 = toGuard({
       '展示层（`.tsx` 页面）默认不判——那里比较状态只影响显示；确需判时用 `includeUi: true`',
     ],
   impact: '状态语义散落各处，改状态机时漏改的那一处不报错、只是行为不同——静默不一致',
-  provenance: "外部试点 A（2026-10）：142 个文件数百处旁路，判据从「零旁路」降级为棘轮计数才活下来；外部试点 B 复跑确认状态值可由 schema 自动提取",
+  provenance: "外部[项目 A]（2026-10）：142 个文件数百处旁路，判据从「零旁路」降级为棘轮计数才活下来；外部[项目 B] 复跑确认状态值可由 schema 自动提取",
   applies(rel) {
     if (!/\.(ts|tsx|js|mjs|mts)$/.test(rel)) return false
     if (/\.(test|spec)\./.test(rel)) return false
     if (/(^|\/)(prisma|drizzle)\//.test(rel)) return false
-    // 首轮外部试跑撞出来的两片噪声（试点 B 的 478 处里约 130 处属这两类）：
+    // 首轮外部试跑撞出来的两片噪声（[项目 B] 的 478 处里约 130 处属这两类）：
     //   ① e2e/seed/探针脚本：它们是**制造**状态的地方，本来就该写裸字面量；
     //   ② 展示层（.tsx）：`status === 'DONE' && '已完成'` 是渲染，不是转移判定。
     // 两类都不是本规则射程（本规则问的是「改转移规则要 grep 多少处」）。
@@ -52,7 +52,7 @@ export const aq02 = toGuard({
   },
   /**
    * 前置条件：找不到状态值来源时**必须声明退出**，不许静默返回空。
-   * 外部试点 A 上没有 prisma enum，本规则曾报「0 处」—— 那个 0 是「没检查」，不是「没洞」。
+   * 外部[项目 A] 上没有 prisma enum，本规则曾报「0 处」—— 那个 0 是「没检查」，不是「没洞」。
    */
   notApplicable(ctx) {
     if (stateValuesOf(ctx).size === 0) {

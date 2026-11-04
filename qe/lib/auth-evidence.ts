@@ -39,7 +39,7 @@ const AUTH_WORD =
 /**
  * 三级判据：**动词 + 名词**的结构判定。
  *
- * `requireMerchant` / `assertAdminAccess` / `ensureSession` / `withMerchantScope` → 是守卫；
+ * `requireEntity` / `assertAdminAccess` / `ensureSession` / `withMerchantScope` → 是守卫；
  * `requireEnv` / `assertValid` / `ensureDir` / `checkFormat` → 不是（名词不在受保护对象里）。
  */
 const GUARD_VERB_RE = /^(?:require|assert|ensure|check|guard|with|verify)[A-Z][\w$]*$/
@@ -55,7 +55,7 @@ const CALL_NAME_RE = /\b([A-Za-z_$][\w$]*)\s*\(/g
 /**
  * 四级判据：「鉴权在领域 helper 里」的**结构**形态。
  *
- *   `const merchant = await resolveMerchant(request)` → `if (!merchant) return apiError(...)`
+ *   `const merchant = await resolveEntity(request)` → `if (!merchant) return apiError(...)`
  *   `const result = await sendHighRiskSmsCode(request, permission)` → `if (!result.ok) return ...`
  *
  * 只看形状，不看名字 —— 列名字只是把问题推到下一个项目。

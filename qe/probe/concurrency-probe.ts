@@ -1,7 +1,7 @@
 /**
  * 并发探针标配工具：≥8 路同 tick 放行 + 反证断言。
  *
- * 抽取自 试点 A `scripts/lib/concurrency-probe.ts`。
+ * 抽取自 [项目 A] `scripts/lib/concurrency-probe.ts`。
  *
  * ## 为什么需要它
  * 三轮 probe 最有价值的发现是一句备注：「2 路并发恰好串行，只放行 1 次」。

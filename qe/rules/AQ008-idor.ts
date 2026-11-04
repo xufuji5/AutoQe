@@ -72,7 +72,7 @@ export const aq08 = toGuard({
       '不判嵌套关联（`include: { record: true }`）是否越权',
     ],
   impact: '把请求里的 id 换成别人的就能读到别人的数据；功能测试永远绿（测的是自己的数据）',
-  provenance: "外部试点 A 的多租户盘点 + 外部试点 B（2026-10）的权限矩阵回填（数据库 RLS 之外的应用层归属校验缺口）",
+  provenance: "外部[项目 A] 的多租户盘点 + 外部[项目 B]（2026-10）的权限矩阵回填（数据库 RLS 之外的应用层归属校验缺口）",
   applies(rel) {
     return isRouteFile(rel)
   },
@@ -86,7 +86,7 @@ export const aq08 = toGuard({
       const map = reviewed as Record<string, string>
       if (typeof map[rel] === 'string' && map[rel].trim() !== '') return []
     }
-    // 平台运营面（后台）跨租户取数是设计：管理员的任务就是处置任意租户的数据。
+    // 平台运营面（后台）跨租户取数是设计：后台用户的任务就是处置任意租户的数据。
     // 这一栏必须在配置里声明前缀，不许默认放行整个仓。
     const covers = (p: string): boolean => {
       const base = p.replace(/\/$/, '')

@@ -248,7 +248,7 @@ export const aq20 = toGuard({
     '限流按 IP 计数等于不存在，IP 白名单可被直接通过，审计里的来源 IP 可以任意指定；' +
     '这一切不报错、不告警，只在读数上表现为「请求来自很多不同 IP」',
   provenance:
-    '试点 E（2026-10）：限流与后台 IP 白名单共用同一个 `getClientIp`，只解析 `x-forwarded-for` 的第一段；' +
+    '[项目 E]（2026-10）：限流与后台 IP 白名单共用同一个 `getClientIp`，只解析 `x-forwarded-for` 的第一段；' +
     '审阅时确认入站同名头没有被代理覆盖，于是任意头值即可换身份。该 helper 自身有单测且全绿——错的不是函数，是「头属于谁」这个前提',
   applies(rel) {
     if (!/\.(?:ts|tsx|js|jsx|mjs|cjs|mts)$/.test(rel)) return false

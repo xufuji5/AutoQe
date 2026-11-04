@@ -4,7 +4,7 @@ title: 兜底写在事务里：事务已被中止，回读只会再失败一次
 status: rule
 rules: [AQ014, AQ004]
 defectClass: 并发正确性 / 防线幻觉
-provenance: 2026-10-25 外部试点 D：账本类写入口的幂等快路在并发下不存在，输家撞唯一索引后 500；第一次修复把回读写在事务内，实测报 current transaction is aborted
+provenance: 2026-10-25 外部[项目 D]：账本类写入口的幂等快路在并发下不存在，输家撞唯一索引后 500；第一次修复把回读写在事务内，实测报 current transaction is aborted
 question: 这个 catch 在事务里还是事务外？它里面用到的还是那个事务句柄吗？
 ---
 

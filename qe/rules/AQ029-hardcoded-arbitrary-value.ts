@@ -31,7 +31,7 @@
  *
  * ✅ 静态可判：正则扫 className 字符串
  * ✅ 跨仓可复现：React/Next.js + Tailwind CSS 项目通用
- * ✅ 有坏样本：skinlab 100+ 处硬编码颜色值、100+ 处硬编码像素值
+ * ✅ 有坏样本：[项目 A] 100+ 处硬编码颜色值、100+ 处硬编码像素值
  * ✅ 误报可控：限定 className 属性 + 颜色/像素模式白名单
  */
 
@@ -136,7 +136,7 @@ export const aq29 = toGuard({
   level: 'warn',
   impact:
     'AI 生成组件时直接把设计稿里的颜色值（#EBEBEB）或像素值（15px）写进 className 的 Tailwind arbitrary value，而不是用项目已定义的设计 token。改主题色要全局替换、跨组件样式不一致、新人不知道项目有 token 系统。',
-  provenance: '2026-10-29 skinlab UI 治理批：marketing/layout.tsx 5 处 border-[#EBEBEB]、' +
+  provenance: '2026-10-29 [项目 A] UI 治理批：marketing/layout.tsx 5 处 border-[#EBEBEB]、' +
     'join/page.tsx 颜色值泛滥、components/merchant/ 下 text-[15px] 20+ 处。globals.css 已定义完整 token 但未被使用。',
 
   applies(rel) {
@@ -174,7 +174,7 @@ export const aq29 = toGuard({
     {
       name: '颜色值 border-[#EBEBEB]（该报）',
       expect: 'warn',
-      rel: 'app/marketing/page.tsx',
+      rel: 'app/[marketing]/page.tsx',
       src:
         'export default function Home() {\n' +
         '  return <div className="border-b border-[#EBEBEB] bg-white">内容</div>\n' +
@@ -183,7 +183,7 @@ export const aq29 = toGuard({
     {
       name: '颜色值 text-[#555]（该报）',
       expect: 'warn',
-      rel: 'app/marketing/page.tsx',
+      rel: 'app/[marketing]/page.tsx',
       src:
         'export default function Home() {\n' +
         '  return <p className="text-[#555] mt-4">正文</p>\n' +
@@ -210,7 +210,7 @@ export const aq29 = toGuard({
     {
       name: 'hover 变体 hover:bg-[#F0F1F3]（该报）',
       expect: 'warn',
-      rel: 'app/marketing/layout.tsx',
+      rel: 'app/[marketing]/layout.tsx',
       src:
         'export function Nav() {\n' +
         '  return <Link className="hover:bg-[#F0F1F3] hover:text-[#222]">首页</Link>\n' +
@@ -228,7 +228,7 @@ export const aq29 = toGuard({
     {
       name: '容器尺寸 max-w-[1100px] 不扫（不该报）',
       expect: 'green',
-      rel: 'app/marketing/layout.tsx',
+      rel: 'app/[marketing]/layout.tsx',
       src:
         'export function Layout() {\n' +
         '  return <div className="max-w-[1100px] mx-auto">内容</div>\n' +
@@ -245,7 +245,7 @@ export const aq29 = toGuard({
     {
       name: '行高 leading-[1.75]（该报）',
       expect: 'warn',
-      rel: 'app/marketing/page.tsx',
+      rel: 'app/[marketing]/page.tsx',
       src:
         'export default function Home() {\n' +
         '  return <p className="text-lg leading-[1.75] text-foreground">正文段落</p>\n' +

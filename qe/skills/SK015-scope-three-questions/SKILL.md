@@ -12,7 +12,7 @@ question: 这段代码是在制造状态、展示状态，还是在判定状态�
 
 ## 血案一：把「制造状态」的地方当成了「旁路状态」
 
-AQ002 在 试点 B 报 478 处，其中约 30 处来自 `scripts/e2e-*.mjs`。
+AQ002 在 [项目 B] 报 478 处，其中约 30 处来自 `scripts/e2e-*.mjs`。
 e2e 脚本的工作就是**造出**各种状态（`status: 'PAID'`），它本来就该裸写值。
 判它「破坏了状态机单源」是把测试工具当成了被测对象。
 
@@ -30,7 +30,7 @@ const done = items.filter((m) => m.status === 'COMPLETED').length
 
 ## 血案三：把「查过又建过」当成了竞态
 
-AQ004 初版只要求「同一模型 find 过、40 行内 create 过」，在 试点 B 报 55 处：
+AQ004 初版只要求「同一模型 find 过、40 行内 create 过」，在 [项目 B] 报 55 处：
 
 ```ts
 const prev = await prisma.processStep.findFirst({ where: { stepNo: stepNo - 1 } })

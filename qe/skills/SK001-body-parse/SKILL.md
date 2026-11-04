@@ -4,7 +4,7 @@ title: 请求体解析未兜底
 status: rule
 rules: [AQ001]
 defectClass: 请求体解析 / 错误封面缺失
-provenance: 试点 A 2026-10 全仓盘点（25 处裸解析，11 处完全无兜底）
+provenance: [项目 A] 2026-10 全仓盘点（25 处裸解析，11 处完全无兜底）
 question: 每个读取请求体的入口，畸形 JSON 时返回的是 400 还是 500？
 ---
 

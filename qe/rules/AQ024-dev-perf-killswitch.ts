@@ -7,7 +7,7 @@
  * bug 修了之后忘了重开，性能损失长期存在：
  *
  *   - `experimental.turbopackFileSystemCacheForDev: false` — 关掉 Turbopack dev 磁盘缓存，
- *     热编译速度降 2-3×（2026-09-18 skinlab 事故：TurbopackInternalError os error 2，
+ *     热编译速度降 2-3×（2026-09-18 [项目 A] 事故：TurbopackInternalError os error 2，
  *     Next 15.2 起已修原子写入，Next 16.x 继承）。
  *
  * ## 判据（形态可复算）
@@ -27,7 +27,7 @@
  *
  * ✅ 静态可判：正则扫 next.config.* + package.json dependencies
  * ✅ 跨仓可复现：Next.js App Router 项目通用
- * ✅ 有坏样本：skinlab next.config.mjs 关掉 turbopackFileSystemCacheForDev
+ * ✅ 有坏样本：[项目 A] next.config.mjs 关掉 turbopackFileSystemCacheForDev
  * ✅ 误报可控：只有 2 个固定配置键值对，且要 Next 版本达标才报
  */
 
@@ -101,7 +101,7 @@ export const aq24 = toGuard({
   level: 'warn',
   impact:
     'Next.js 配置里关了已知性能优化（底层 bug 已修），dev 热编译或生产构建变慢。',
-  provenance: '2026-10-29 Web3 团长后台性能批：next.config.mjs 关掉 ' +
+  provenance: '2026-10-29 Web3 [项目 B]性能批：next.config.mjs 关掉 ' +
     'turbopackFileSystemCacheForDev，Next 16.3 已继承修复。',
 
   /**

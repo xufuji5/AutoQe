@@ -662,7 +662,7 @@ export const registry: Invariant[] = [
     decidedAt: '2026-10-25',
   },
 
-  /* ---------- Next.js 性能（2026-10-29 团长后台性能批泛化） ---------- */
+  /* ---------- Next.js 性能（2026-10-29 [项目 B]性能批泛化） ---------- */
   {
     id: 'INV-PERF-01',
     statement: '导出的异步 DB 读函数被 2+ Server Component 调用时，必须用 React.cache() 包裹（同请求合并）',
@@ -688,13 +688,13 @@ export const registry: Invariant[] = [
     statement: 'Promise.all 之后的独立 await（无解构变量依赖）必须挪进并发块',
     defectClasses: ['隐性陷阱', '证据不足'],
     guard: 'qe:guard:aq25',
-    badSample: 'qe/rules/AQ025-serial-after-promise-all.ts 的 fixtures（merchantInsight 在 Promise.all 后独立 await）',
+    badSample: 'qe/rules/AQ025-serial-after-promise-all.ts 的 fixtures（[insight] 在 Promise.all 后独立 await）',
     status: 'partial',
     gap: '只看 Promise.all 解构绑定名 × 后续 ≤5 行 await 实参；helper 内部隐式依赖不在射程；`const { a } =` 对象解构不在射程',
     decidedAt: '2026-10-29',
   },
 
-  /* ---------- UI 文案（2026-10-29 skinlab UI 优化批） ---------- */
+  /* ---------- UI 文案（2026-10-29 [项目 A] UI 优化批） ---------- */
   {
     id: 'INV-UI-01',
     statement: '短标签位（Hint/Disclosure summary/title/button/p/span）承载的文案不得超过 20 中文字（title 属性 ≤15）',
@@ -746,13 +746,13 @@ export const registry: Invariant[] = [
     decidedAt: '2026-11-03',
   },
 
-  /* ---------- DB 真相源与性能（2026-10-29 skinlab DB 治理批） ---------- */
+  /* ---------- DB 真相源与性能（2026-10-29 [项目 A] DB 治理批） ---------- */
   {
     id: 'INV-DB-01',
     statement: '同函数内不得在同一 Model 上先 findFirst/findUnique 再 create（check-then-act），除非 where 字段覆盖了 schema 的 @unique/@@unique 或改用 upsert',
     defectClasses: ['竞态条件', '数据完整性', 'AI 幻觉'],
     guard: 'qe:guard:aq30',
-    badSample: 'qe/rules/AQ030-check-then-act-without-unique.ts 的 fixtures；skinlab NotificationTask 静默重复（2026-10-29 回顾）',
+    badSample: 'qe/rules/AQ030-check-then-act-without-unique.ts 的 fixtures；[项目 A] NotificationTask 静默重复（2026-10-29 回顾）',
     status: 'partial',
     gap: '跨函数 findFirst + create 不扫（静态看不见调用链）；findFirst where 无变量解，无法精确判定是否覆盖唯一约束',
     decidedAt: '2026-10-29',
@@ -762,7 +762,7 @@ export const registry: Invariant[] = [
     statement: 'Prisma findMany/findFirst/findUnique 调用不得省略 select（至少声明需要的列），尤其当目标 Model 含 Text/Json/Blob 重列',
     defectClasses: ['性能', 'I/O 浪费', 'AI 幻觉'],
     guard: 'qe:guard:aq31',
-    badSample: 'qe/rules/AQ031-prisma-read-no-select.ts 的 fixtures；skinlab Product 表有 4 个重列（ingredientsRaw/description/bundleComponents/comboRefs）',
+    badSample: 'qe/rules/AQ031-prisma-read-no-select.ts 的 fixtures；[项目 A] [产品表]有 4 个重列（[column]/description/[column]/[column]）',
     status: 'partial',
     gap: '只扫有 schema 的项目；select: {} 声明也放行（可能用户确实要全列，但应该在 review 里说明）；不扫 findRaw/$queryRaw',
     decidedAt: '2026-10-29',
@@ -773,7 +773,7 @@ export const registry: Invariant[] = [
     statement: 'Next.js App Router 同一目录子树（app/xxx）内不得有 ≥2 个 Server Component 直接 await auth()/getSession() 等身份获取；应只在顶层 layout 调一次通过 props 下发',
     defectClasses: ['性能', '重复计算', 'AI 幻觉'],
     guard: 'qe:guard:aq32',
-    badSample: 'qe/rules/AQ032-duplicate-auth-in-tree.ts 的 fixtures；skinlab admin/ layout + 9 page 全裸调 auth()',
+    badSample: 'qe/rules/AQ032-duplicate-auth-in-tree.ts 的 fixtures；[项目 A] admin/ layout + 9 page 全裸调 auth()',
     status: 'partial',
     gap: '只扫 await auth() 精确形态；不同子树各自独立调用放行（跨子树本来就是不同请求边界）；getSessionUserId()/getUserFromRequest() 等函数调用被 AQ023 覆盖',
     decidedAt: '2026-10-29',
@@ -784,7 +784,7 @@ export const registry: Invariant[] = [
     statement: 'Next.js async Server Component 不得直接 await 外部 HTTP API（微信出码/支付签名/第三方服务）；必须用 unstable_cache 包装，TTL 与 page revalidate 一致',
     defectClasses: ['性能', '绕过 ISR', 'AI 幻觉'],
     guard: 'qe:guard:aq33',
-    badSample: 'qe/rules/AQ033 fixtures；skinlab scan-card.tsx 生产 TTFB 2.9s（2026-10-29 性能批根因）',
+    badSample: 'qe/rules/AQ033 fixtures；[项目 A] scan-card.tsx 生产 TTFB 2.9s（2026-10-29 性能批根因）',
     status: 'partial',
     gap: '只扫 Server Component 文件；不扫 Prisma 读（AQ023 覆盖）；函数里 import React.cache 放行（开发者已意识到）',
     decidedAt: '2026-10-29',
@@ -794,7 +794,7 @@ export const registry: Invariant[] = [
     statement: 'Next.js Server Component 顶层（模块作用域）不得出现 new Date()/Date.now()；ISR prerender 应在请求级函数内部获取时间值',
     defectClasses: ['性能', '缓存失效', 'prerender 错误'],
     guard: 'qe:guard:aq34',
-    badSample: 'qe/rules/AQ034 fixtures；skinlab /join/apply page 顶层 new Date() 导致 prerender 错误（2026-10-29 性能批附录六）',
+    badSample: 'qe/rules/AQ034 fixtures；[项目 A] /join/apply page 顶层 new Date() 导致 prerender 错误（2026-10-29 性能批附录六）',
     status: 'partial',
     gap: '只扫 app/**/layout|page|error|loading 文件；jobs/scripts/lib 下的顶层 new Date() 放行（非 Server Component）',
     decidedAt: '2026-10-29',
@@ -804,7 +804,7 @@ export const registry: Invariant[] = [
     statement: '声明了 unstable_cache tags 的项目必须在对应写路由里添加 revalidateTag 失效钩子，或在 cache 旁边注释说明 TTL 依赖关系',
     defectClasses: ['性能', '数据新鲜度', '缓存一致性'],
     guard: 'qe:guard:aq35',
-    badSample: 'qe/rules/AQ035 fixtures；skinlab merchant-shell cacheTag 注释预留但写路由无 revalidateTag（2026-10-29 性能批附录六）',
+    badSample: 'qe/rules/AQ035 fixtures；[项目 A] [cache-tag] cacheTag 注释预留但写路由无 revalidateTag（2026-10-29 性能批附录六）',
     status: 'partial',
     gap: '当前只扫"声明了但全项目零 revalidateTag"的简化版本；未做 tag → 业务域自动关联；comment 里的 cacheTag 也算声明',
     decidedAt: '2026-10-29',
@@ -814,7 +814,7 @@ export const registry: Invariant[] = [
     statement: 'Prisma schema 注释里声明的 partial index（Prisma 不可表达）必须在 prisma/migrations/ 下的 migration.sql 里有 CREATE INDEX 落地',
     defectClasses: ['性能', '索引缺失', '查询退化'],
     guard: 'qe:guard:aq37',
-    badSample: 'qe/rules/AQ037 fixtures；skinlab schema.prisma 至少 5 处 partial index 声明（msg_unread / msg_pending / payment_records_group_active_key 等）',
+    badSample: 'qe/rules/AQ037 fixtures；[项目 A] schema.prisma 至少 5 处 partial index 声明（[msg-status] / msg_pending / [redis-key] 等）',
     status: 'partial',
     gap: '只扫 schema 注释里能解析出索引名的；如果 schema.provider=none 或 migrations 目录不存在则跳过',
     decidedAt: '2026-10-29',
@@ -824,7 +824,7 @@ export const registry: Invariant[] = [
     statement: 'Prisma 项目的 DATABASE_URL 必须显式包含 connection_limit 参数，否则每个 PrismaClient 实例默认 5 连接，多 worker 下连接数不可控',
     defectClasses: ['性能', '连接池配置', '生产运维'],
     guard: 'qe:guard:aq38',
-    badSample: 'qe/rules/AQ038 fixtures；skinlab .env.example DATABASE_URL 无 connection_limit（默认 5）',
+    badSample: 'qe/rules/AQ038 fixtures；[项目 A] .env.example DATABASE_URL 无 connection_limit（默认 5）',
     status: 'partial',
     gap: '只扫 .env / .env.example / .env.production；不扫 DIRECT_URL（它不影响连接池）',
     decidedAt: '2026-10-29',
@@ -834,7 +834,7 @@ export const registry: Invariant[] = [
     statement: 'Prisma 查询 where 条件组合里同时过滤多字段，schema 应存在覆盖这些前导列的复合 @@index；没有时提示开发者考虑建索引',
     defectClasses: ['性能', '索引缺失', '查询退化'],
     guard: 'qe:guard:aq36',
-    badSample: 'qe/rules/AQ036；skinlab Order 表 GMV 查询 where: { merchantId, paidAt } 至少 5 处缺 [merchantId, paidAt] 复合索引',
+    badSample: 'qe/rules/AQ036；[项目 A] Order 表 GMV 查询 where: { merchantId, paidAt } 至少 5 处缺 [merchantId, paidAt] 复合索引',
     status: 'partial',
     gap: '提示级 (info) 不强制 WARN；无法静态判定查询频率，由人决定是否加索引',
     decidedAt: '2026-10-29',
@@ -844,7 +844,7 @@ export const registry: Invariant[] = [
     statement: 'Schema 里有 expiresAt/validUntil 等生命周期字段的 Model，jobs/ 目录下应有对应的定期清理 cron',
     defectClasses: ['性能', '数据生命周期', '表体积膨胀'],
     guard: 'qe:guard:aq39',
-    badSample: 'qe/rules/AQ039；skinlab idempotency_token / queue_jobs / error_events 有 expiresAt 但无清理 job',
+    badSample: 'qe/rules/AQ039；[项目 A] idempotency_token / [expiring-table] / [expiring-table] 有 expiresAt 但无清理 job',
     status: 'partial',
     gap: '提示级 (info)；注释里显式写"无清理 job/合规保留"的 Model 自动跳过',
     decidedAt: '2026-10-29',

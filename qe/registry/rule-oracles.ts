@@ -195,7 +195,7 @@ export const RULE_ORACLES: Record<string, RuleOracle> = {
     guardedBy: ['INV-PERF-03'],
   },
 
-  /* ---------- AQ026–AQ028：UI 文案（2026-10-29 skinlab UI 优化批） ---------- */
+  /* ---------- AQ026–AQ028：UI 文案（2026-10-29 [项目 A] UI 优化批） ---------- */
   aq26: {
     source:
       '.tsx/.jsx 组件文件内双引号字符串字面量 × 中文字符计数（正则 [\\u4e00-\\u9fa5]）' +
@@ -240,7 +240,7 @@ export const RULE_ORACLES: Record<string, RuleOracle> = {
   aq32: {
     source:
       'Server Component 文件（app/**/layout|page）× await auth() 等身份调用正则' +
-      ' × 目录子树分组（app/admin/ vs app/merchant/）× ≥2 个文件命中判定',
+      ' × 目录子树分组（app/[admin]/ vs app/[feature]/）× ≥2 个文件命中判定',
     kind: 'machine',
     guardedBy: ['INV-PERF-03'],
   },

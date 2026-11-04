@@ -7,8 +7,8 @@
  * + cron scheduler + queue worker = 约 6 个独立 PrismaClient 实例 → 峰值 30 连接。
  * PostgreSQL 默认 max_connections=100 够使，但不显式配置就没留余地。
  *
- * skinlab 真实案例：.env.example 里
- *   DATABASE_URL="postgresql://user:pass@host:5432/db?schema=public"
+ * [项目 A] 真实案例：.env.example 里
+ *   DATABASE_URL="postgresql://[host]:[port]/[dbname]?schema=public"
  * 没有 connection_limit 参数，依赖 Prisma 默认值。
  *
  * ## 判据
@@ -53,7 +53,7 @@ export const aq38 = toGuard({
   impact:
     'Prisma Client 默认 connection_limit=5（每个实例）。Next.js 生产多 worker + cron + queue = ' +
     '多实例并发，连接数不可控。建议 DATABASE_URL 加 connection_limit=10&pool_timeout=20 显式配置。',
-  provenance: '2026-10-29 skinlab DB 诊断报告四·2：.env.example DATABASE_URL 无 connection_limit 参数。',
+  provenance: '2026-10-29 [项目 A] DB 诊断报告四·2：.env.example DATABASE_URL 无 connection_limit 参数。',
 
   applies() {
     // 跨文件分析: 对所有文件返回 true, analyze 内部用 flag 保证只跑一次
@@ -99,7 +99,7 @@ export const aq38 = toGuard({
         message:
           `${foundEnvFile} 里的 DATABASE_URL 没显式 connection_limit 参数。` +
           `Prisma Client 默认 5/实例，多 worker 下连接数不可控。` +
-          `建议：postgres://user:pass@host:5432/db?connection_limit=10&pool_timeout=20`,
+          `建议在连接串末尾加 connection_limit=10&pool_timeout=20 查询参数`,
         evidence: `DATABASE_URL="${dbUrl}" — 无 connection_limit`,
       })
     } else if (parseInt(limit, 10) < 5) {
@@ -119,7 +119,7 @@ export const aq38 = toGuard({
 
   fixtures: [
     // 跨文件守卫 (.env 文件): selftest 无法模拟 ctx.readFile(".env")
-    // 正确性通过项目级实扫验证 (skinlab .env 无 connection_limit → 正确报 1 WARN).
+    // 正确性通过项目级实扫验证 ([项目 A] .env 无 connection_limit → 正确报 1 WARN).
     {
       name: '占位 -- 跨文件守卫需项目级实扫验证',
       expect: 'skip',

@@ -4,7 +4,7 @@ title: 夹具取 CLI 路径（写死依赖目录 / argv[1] 当解释器）
 status: rule
 rules: [AQ011]
 defectClass: 隐性陷阱 / 探针结论缺失
-provenance: 试点 C（2026-10）：同一批内两次栽在夹具取运行时 CLI 上——先写死 node_modules 绝对路径（worktree 里零输出被读成被测代码抛穿），修法第一版又假设 argv[1] 是运行时 CLI
+provenance: [项目 C]（2026-10）：同一批内两次栽在夹具取运行时 CLI 上——先写死 node_modules 绝对路径（worktree 里零输出被读成被测代码抛穿），修法第一版又假设 argv[1] 是运行时 CLI
 question: 这个可执行文件在干净 checkout 里存在吗？不存在时子进程会输出什么、而我会把它读成什么？
 ---
 

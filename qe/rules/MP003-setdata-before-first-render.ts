@@ -136,7 +136,7 @@ export const mp03 = toGuard({
   impact:
     '首渲染前 setData：视图层尚未准备好接收更新，宿主抛 `webviewScriptError: Expected updated data but get first rendering data`，真机必现、DevTools 常被吞',
   provenance:
-    '试点 B（2026-10）：自定义 tabBar 的三个 setData 来源之一在 attached 里，真机首屏报 Expected updated data but get first rendering data',
+    '[项目 B]（2026-10）：自定义 tabBar 的三个 setData 来源之一在 attached 里，真机首屏报 Expected updated data but get first rendering data',
   applies(rel) {
     return isMpSource(rel, /\.(?:js|ts)$/)
   },

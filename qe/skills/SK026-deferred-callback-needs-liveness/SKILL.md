@@ -4,7 +4,7 @@ title: 回调跑起来的时候，接收方还活着吗、还准备好了吗
 status: rule
 rules: [MP001, MP003, MP007]
 defectClass: 生命周期 / 时序
-provenance: 2026-10-24 试点 B：线上崩溃 `__subPageFrameEndTime__` of null 定位到「清了定时器但回调仍写视图」；同仓自查又发现自定义组件在 attached 里同步 setData
+provenance: 2026-10-24 [项目 B]：线上崩溃 `__subPageFrameEndTime__` of null 定位到「清了定时器但回调仍写视图」；同仓自查又发现自定义组件在 attached 里同步 setData
 question: 这个回调在未来某个时刻执行时，它要写的那个对象还在吗、还处于能接收更新的阶段吗？
 ---
 

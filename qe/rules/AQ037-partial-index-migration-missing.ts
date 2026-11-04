@@ -8,8 +8,8 @@
  * 缺陷发生在: 注释写了只落迁移但 migration.sql 忘写了 -- 开发以为有索引加速,
  * 实际查询走 seq scan, 生产一压测就炸.
  *
- * skinlab 真实案例 (schema.prisma):
- *   - msg_unread ON (to_user, from_user) WHERE is_read=false  (红点 count)
+ * [项目 A] 真实案例 (schema.prisma):
+ *   - [msg-status] ON (to_user, from_user) WHERE is_read=false  (红点 count)
  *   - msg_pending ON (to_user, created_at) WHERE first_reply_at IS NULL  (首响打点)
  *   - UNIQUE(order_id) WHERE status <> failed  (一单一行兜底)
  *
@@ -145,8 +145,8 @@ export const aq37 = toGuard({
     'Prisma 不支持 partial index, schema 里注释声明了要建的索引但 migration.sql 里忘写了. ' +
     '开发以为有索引加速, 实际查询走 seq scan -- 生产一压测就炸. ' +
     '解法: 在 prisma/migrations/ 下新增迁移写 CREATE INDEX, 或删除 schema 里无效声明.',
-  provenance: '2026-10-29 skinlab DB 诊断: schema.prisma 注释里至少 5 个 partial index 声明' +
-    ' (msg_unread / msg_pending / payment_records_group_active_key / merchants_phone_key 等),' +
+  provenance: '2026-10-29 [项目 A] DB 诊断: schema.prisma 注释里至少 5 个 partial index 声明' +
+    ' ([msg-status] / msg_pending / [redis-key] / merchants_phone_key 等),' +
     ' 需要验证 migration.sql 里是否都已落地.',
 
   applies() {
@@ -221,7 +221,7 @@ export const aq37 = toGuard({
   fixtures: [
     // 跨文件守卫 (schema.prisma + prisma/migrations/**/migration.sql):
     // selftest 无法模拟多文件 ctx.readFile, 所以不放具体 src fixture.
-    // 正确性通过项目级实扫验证 (skinlab 全部 7 个声明的索引都在 migration.sql 里落地 → 0 WARN).
+    // 正确性通过项目级实扫验证 ([项目 A] 全部 7 个声明的索引都在 migration.sql 里落地 → 0 WARN).
     // 本条目只为满足守卫三态要求, 不作为实际测试用例.
     {
       name: '占位 -- 跨文件守卫需项目级实扫验证',

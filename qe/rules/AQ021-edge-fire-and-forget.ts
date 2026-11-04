@@ -168,7 +168,7 @@ export const aq21 = toGuard({
     '审计/埋点/通知没有写进去，失败又被空 catch 吞掉；外面只看到「请求成功」，' +
     '数据缺口要等对账时才被发现',
   provenance:
-    '试点 E（2026-10）：Edge middleware 里写审计的 Promise 以 `.catch(() => {})` 结尾，未交给 waitUntil；' +
+    '[项目 E]（2026-10）：Edge middleware 里写审计的 Promise 以 `.catch(() => {})` 结尾，未交给 waitUntil；' +
     '压测后审计表记录数只有请求数的三分之一，日志与响应码全部正常。修复前后静态判据都能复算出同一个结论',
   applies(rel) {
     if (!/\.(?:ts|tsx|js|jsx|mjs|cjs|mts)$/.test(rel)) return false

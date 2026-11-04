@@ -67,7 +67,7 @@ const SECRET: { re: RegExp; why: string }[] = [
  * `order` 在普通英文散文里出现，ban 掉只会制造假红（2026-10-24 自测实测）。
  */
 const DOMAIN_VOCAB_RE =
-  /\b(?:sku|coupon|cart)\b|电商|商城|订单|库存|商品|商户|店铺|退款|结算|购物车|优惠券|卖超|批号|下单|发货|物流|团购|团长|售后/gi
+  /\b(?:sku|coupon|cart)\b|电商|商城|订单|库存|商品|账户|商户|退款|结算|购物车|优惠券|卖超|批号|下单|发货|物流|团购|管理员|售后/gi
 const DOMAIN_HINT = '改为「请求 / 资产 / 记录」这类通用实体名'
 
 const DEFAULT_IGNORE = ['node_modules', '.git', 'qe-report', 'qe-audit', '.fixtures-generated', 'dist', 'build', '.next']
@@ -121,7 +121,7 @@ function scanLine(line: string, denyTerms: DenyTerm[], checkDomain: boolean): Li
     if (!line.includes(t.term)) continue
     out.push({
       code: 'PROJECT_CODEWORD',
-      message: `项目代号「${t.term}」${t.hint ? `（改为${t.hint}）` : '（改为匿名代号，如 外部试点 A/B）'}`,
+      message: `项目代号「${t.term}」${t.hint ? `（改为${t.hint}）` : '（改为匿名代号，如 外部[项目 A]/B）'}`,
     })
   }
   if (checkDomain) {

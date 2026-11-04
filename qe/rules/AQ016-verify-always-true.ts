@@ -144,7 +144,7 @@ export const aq16 = toGuard({
     '签名里收着入参、函数体却从不读它，直接返回 `true` / `{ ok: true }`：调用方以为每次都在被校验，实际每次都被放行。' +
     '这类假闸门不报错、类型正确、单测也过——它把「高危操作的二次验证」变成一句注释',
   provenance:
-    '试点 D（2026-10）：高危打款路由的「短信二次验证」函数首行直接 `return { ok: true }`；更早一次是权限校验返回 `{ authorized: false }` 却由调用方忽略返回值。两处都表现为「闸门在代码里存在，在运行时不存在」',
+    '[项目 D]（2026-10）：高危打款路由的「短信二次验证」函数首行直接 `return { ok: true }`；更早一次是权限校验返回 `{ authorized: false }` 却由调用方忽略返回值。两处都表现为「闸门在代码里存在，在运行时不存在」',
   applies(rel) {
     if (!/\.(?:ts|tsx|js|jsx|mjs|cjs|mts)$/.test(rel)) return false
     if (/(^|\/)node_modules\//.test(rel)) return false

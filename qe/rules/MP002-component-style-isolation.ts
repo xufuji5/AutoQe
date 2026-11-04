@@ -50,7 +50,7 @@ export const mp02 = toGuard({
   impact:
     '自定义组件默认 `styleIsolation: isolated`，`app.wxss` 的样式不会作用到组件内部：类名写对了但样式不生效，且没有任何报错',
   provenance:
-    '试点 B（2026-10）：把页面结构抽成组件后，集中写在 app.wxss 的排版类在组件里全部失效；DevTools 无告警，真机表现为字号/颜色回落到继承值',
+    '[项目 B]（2026-10）：把页面结构抽成组件后，集中写在 app.wxss 的排版类在组件里全部失效；DevTools 无告警，真机表现为字号/颜色回落到继承值',
   applies(rel) {
     return isMpSource(rel, /\.(?:js|ts)$/)
   },

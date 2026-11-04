@@ -4,7 +4,7 @@ title: 状态裸字面量旁路
 status: rule
 rules: [AQ002]
 defectClass: 状态机语义外泄 / 单源破坏
-provenance: 试点 A INV-03：142 文件数百处旁路，判据从「零旁路」降级为棘轮才活下来
+provenance: [项目 A] INV-03：142 文件数百处旁路，判据从「零旁路」降级为棘轮才活下来
 question: 改一个状态转移，你需要 grep 多少个文件才知道改全了？
 ---
 

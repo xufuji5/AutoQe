@@ -5,17 +5,17 @@
  *
  * 报告 v1.0 §2.3 列出了 8 张需要清理 cron 的表:
  *
- *   idempotency_tokens — expiresAt < now, 每日
- *   queue_jobs         — 终态 7 天, 每日
- *   notification_attempts — 终态 30 天, 每日
- *   error_events       — 1 年, 每周
+ *   [expiring-table] — expiresAt < now, 每日
+ *   [expiring-table]         — 终态 7 天, 每日
+ *   [expiring-table] — 终态 30 天, 每日
+ *   [expiring-table]       — 1 年, 每周
  *   messages           — 180 天, 每周
- *   compliance_check_records — 1 年, 每周
- *   audit_logs         — 3 年 (合规), 归档而非删除
- *   exposures          — 90 天 detach 到归档表, 每月
+ *   [expiring-table] — 1 年, 每周
+ *   [expiring-table]         — 3 年 (合规), 归档而非删除
+ *   [expiring-table]          — 90 天 detach 到归档表, 每月
  *
- * skinlab 实查: exposures 有清理 (nightly-ranking.ts:1529 deleteMany), 但 idempotency_token、
- * queue_jobs、error_events、compliance_check_records、audit_logs 只有 scripts/smoke 里
+ * [项目 A] 实查: [expiring-table] 有清理 (nightly-ranking.ts:1529 deleteMany), 但 idempotency_token、
+ * [expiring-table]、[expiring-table]、[expiring-table]、[expiring-table] 只有 scripts/smoke 里
  * 按需删除, jobs/ 目录下没有定期清理 cron.
  *
  * ## 判据
@@ -146,8 +146,8 @@ export const aq39 = toGuard({
     'Schema 里有 expiresAt/validUntil 字段的表（意味着数据会过期），但 jobs/ 目录下没有定期清理的 cron — ' +
     '一年后可能是几百万行，任何时间窗查询都会变慢，那时再做就是在线手术。' +
     '提示级：有些表可能确实不需要清理（量可控），由人决定。',
-  provenance: '2026-10-29 skinlab DB 优化包 v1.0 §2.3: 8 张表需要清理 cron，' +
-    '实查 exposures 有清理但 idempotency_token / queue_jobs / error_events / compliance_check_records / audit_logs 都没有.',
+  provenance: '2026-10-29 [项目 A] DB 优化包 v1.0 §2.3: 8 张表需要清理 cron，' +
+    '实查 [expiring-table] 有清理但 idempotency_token / [expiring-table] / [expiring-table] / [expiring-table] / [expiring-table] 都没有.',
 
   applies() { return true },
 

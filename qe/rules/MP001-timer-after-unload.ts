@@ -72,7 +72,7 @@ export const mp01 = toGuard({
   impact:
     '`clearInterval` 挡不住已入队的那一轮回调：页面销毁后仍会 setData，宿主查不到页面帧（典型表现是 `__subPageFrameEndTime__` of null）；导航类调用还会把用户从别的页面拽走',
   provenance:
-    '试点 B（2026-10）：线上崩溃栈 `__subPageFrameEndTime__` of null / `<setInterval callback function>`，定位到 5 处定时器——全部写了 clearInterval，无一处做回调内存活判定',
+    '[项目 B]（2026-10）：线上崩溃栈 `__subPageFrameEndTime__` of null / `<setInterval callback function>`，定位到 5 处定时器——全部写了 clearInterval，无一处做回调内存活判定',
   applies(rel) {
     return isMpSource(rel, /\.(?:js|ts|jsx|tsx|mjs)$/)
   },

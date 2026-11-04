@@ -56,7 +56,7 @@ export const mp05 = toGuard({
   impact:
     '`app.json` 没注册的路径，开发者工具按文件名能打开，但真机 `wx.navigateTo` 必定失败（`page … is not found`）',
   provenance:
-    '试点 B（2026-10）：新增页面四件套齐备但漏登记 `pages`，工具里手点能开、真机跳转全失败；同类问题在分包 root 前缀上又犯一次',
+    '[项目 B]（2026-10）：新增页面四件套齐备但漏登记 `pages`，工具里手点能开、真机跳转全失败；同类问题在分包 root 前缀上又犯一次',
   applies(rel) {
     return isMpSource(rel, /\.(?:js|ts)$/)
   },
