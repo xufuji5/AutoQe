@@ -7,10 +7,6 @@ build/
 .next/
 coverage/
 
-# QE generated artifacts
-qe-report/
-qe-audit/
-reports/
 # 审计输出一律写到仓外（外部审计目录）；这两条是兜底：
 # 2026-10-24 实测有人在仓根 `> scan-<project>-1.txt`，把项目名与本机路径留在了工作树
 # （未提交，但 leak 守卫当场报红 15 条 —— 差一次 `git add -A` 就永久进历史）
@@ -29,6 +25,16 @@ denylist.local.txt
 # 2026-10-25 实测 tmp-probe-*.ts 含本机绝对路径与另一项目代号，leak 守卫当场报红 5 条。
 scripts/tmp-*
 qe/probe/tmp-*
+
+# === 外部配置与运行期产物（绝不在 AutoQe 引擎仓内留存）===
+# qe.config.json 含被审计项目的路径/凭据/内部代号，绝不入库。
+# 扫描工作流：配置与结果放在 <AutoQe 平行目录>/<project>/ 下，
+# 通过 `autoqe run --root <target> --config <外部配置>` 调用，对目标仓零侵入。
+/qe.config.json
+# 扫描结果目录（配置旁自动生成；外部配置模式下默认落盘位置）
+/qe-report/
+/qe-audit/
+reports/
 qe.config.*.json
 # 例外：域预设不含任何工程信息（只有 roots/扩展名/规则开关），是随包分发的产物。
 # 不加这条，README 里让用户 `--config qe.config.miniprogram.json` 的那一行就是死链——
